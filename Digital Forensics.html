@@ -1,0 +1,2127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Digital Forensics · A Tutorial for FDEs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="image-slot.js"></script>
+<script type="application/json" id="speaker-notes">
+[
+  "For most of the last decade, we treated uploads as content to store, moderate, or parse. Now we have to treat them as claims about reality. A selfie video claims a person is present. A signed PDF claims a document is complete and unmodified. A photo claims an event happened the way it appears. The core problem in digital forensics is no longer academic · it is whether our products can decide what deserves trust, what deserves friction, and what deserves escalation. Over the next thirty minutes I want to give you a model for thinking about that, and a default stack you can take back to your team on Monday.",
+  "The practical question is not 'Can I detect deepfakes in the abstract?' It is 'Where in my product can a forged file create risk?' If you accept user photos or videos, this is a moderation and abuse problem. If you do remote onboarding, it becomes an injection-attack and presentation-attack problem. If customers send invoices, receipts, or claim images, it becomes a fraud problem. If you move signed PDFs through a workflow, it becomes a signature validation and chain-of-custody problem. The same uploaded file can be all four of those things depending on the product surface it lands on.",
+  "This distinction matters because detection methods change by category. Copy-move and splicing are classic image-tampering problems. Voice cloning and face swaps are synthetic-media problems. A digitally signed PDF can be solved by cryptographic validation. A photographed contract or scanned invoice is a visual-forensics problem. A selfie video for onboarding is a biometric capture problem. If we collapse all of these into the word 'deepfake,' our engineering design gets worse. The discipline you reach for depends on whether the asset was captured, generated, or signed.",
+  "This is the central slide of the talk. If you remember one thing, remember this stack. Provenance and signatures answer: who or what claims authorship, and can we validate that claim? Metadata and structure answer: what do the file container and history say? Passive clues answer: what traces did editing or generation leave in the pixels, frames, or waveform? Model detectors answer: how does a trained system score this asset? Context answers: where else has this content appeared, and does the surrounding story hold together? Strong systems do not pick one layer. They combine them, and they trust positive evidence more than negative evidence. A valid signature is stronger than a detector saying 'probably real.'",
+  "The biggest mindset shift I want this audience to make is from pure detection to provenance. C2PA gives you a standard way to attach signed provenance to media · a manifest containing assertions, a claim, and a cryptographic signature, with hard bindings like file hashes and soft bindings like fingerprints or invisible watermarks. The CAI even recommends progressive disclosure · a simple check at level one, full forensic trust signals at level four. In parallel, proactive watermarking systems like Google's SynthID embed signals into AI-generated content that survive cropping, filtering, and lossy compression. The crucial caveat · missing credentials do not prove a file is fake. Adoption is incomplete, and metadata can be stripped in distribution.",
+  "For images and PDFs your quick-triage order should be boring and fast. ExifTool reads metadata across hundreds of file formats · camera, timestamps, edit history, GPS, writing software, embedded provenance. For media, ffprobe and MediaInfo expose container, codec, writing application, bit rate, color space. For PDFs, qpdf checks structure and PDFiD scans for suspicious keywords like slash-JS, slash-OpenAction, slash-Launch, slash-XFA. None of this is detection. It is triage. It tells you what the file claims about itself before any model gets involved, and it costs almost nothing per upload.",
+  "Classic image forensics still matters. JPEG quantization tables can sometimes confirm or deny an image's source, and double JPEG compression reveals that an image was loaded and re-saved · though that alone is not proof of malicious tampering. Geometric and physical cues · shadows, reflections, vanishing points, environmental lighting · remain useful, especially when multiple objects in a supposedly authentic scene should obey the same physics. For documents, the field is moving toward multi-type tamper localization rather than binary classification. These are the clues a human forensic analyst would look at, and they remain a useful escalation layer above metadata.",
+  "This slide is where you earn trust with the audience. Say it clearly · absence of evidence is not evidence of authenticity. Detectors are not solved. Deepfake-Eval-2024 reports that open-source state-of-the-art detector AUC drops sharply on recent in-the-wild content. Berkeley's 2025 work found no fine-tuning method achieved meaningful zero-shot generalization to unseen generators. Even commercial models do not yet match human forensic analysts. The honest engineering posture is not 'deploy a classifier and be done.' It is 'deploy layered signals, benchmark on recent data, and keep human escalation paths.'",
+  "Context is often the fastest human-in-the-loop layer. Reverse image search via Google Lens or Bing finds prior appearances, alternative crops, earlier contexts of suspicious imagery. The InVID Verification Plugin combines keyframe extraction, reverse search, magnification, forensic filters, and metadata reading in a single browser workflow · it's the closest thing the analyst community has to a Swiss army knife. For high-stakes media, corroboration is what turns a probabilistic score into a defensible decision. Your product can give analysts a console that does this; it doesn't have to remain a manual workflow forever.",
+  "This is where many teams make expensive mistakes. If a document is natively digitally signed, start with the signature, the certificate chain, the timestamp, and the validation status. Adobe and Docusign both describe tamper-evident seals, hash-based signing, audit trails, and invalidation if bytes change after signing. That is the cleanest positive-evidence path you'll find anywhere in this talk. But if the file is just a photo or scan or a flattened PDF, that protection does not exist. Then you treat it as a forensic image problem · structural PDF checks, suspicious-object triage, visual tamper detection, OCR cross-checks, and human review.",
+  "This is the architecture I would recommend for production systems. Never analyze a transformed derivative first. Store the original bytes in a quarantine bucket. Run generic secure-upload controls, then extract metadata and provenance before any transcoding or resizing. Pass only necessary derived features to your detectors. Save the outputs as structured evidence, not just a single score. Then let a policy engine decide · auto-allow, add friction, request resubmission, or escalate to a human reviewer. For high-stakes flows, archive the original, the hash, the analysis logs, and the decision record together as one evidence object.",
+  "Most failures in this space are product failures, not model failures. If your UI shows a single red 'fake' badge, users will over-trust it and analysts will under-learn from it. A better pattern is evidence cards · signature status, provenance status, metadata anomalies, detector outputs, and context findings shown side by side, each explainable on its own. Users should see what can be explained. Analysts should see the original, the derived media, and the machine findings together. For low-risk products, you may only log these signals. For high-risk products, you can turn them into friction · resubmission, a liveness step-up, or a manual check.",
+  "If I were turning this talk into engineering work on Monday, I would do three things. First, preserve originals and hashes in the upload path · this is the cheapest, highest-leverage change you can make this quarter. Second, add first-pass provenance and signature checks wherever the modality allows it · that is where positive evidence lives. Third, benchmark one detection flow on recent, in-the-wild examples before any policy depends on it. The goal is not to build a universal truth engine. The goal is to make your product harder to trick, easier to audit, and safer to operate. Thank you · I'd love questions."
+]
+</script>
+
+<style>
+  :root {
+    /* palette · editorial / investigative */
+    --paper:    #F1ECE2;
+    --paper-2:  #E8E1D2;
+    --paper-3:  #DFD6C2;
+    --ink:      #1A1814;
+    --ink-2:    #2C2823;
+    --muted:    #6B6258;
+    --muted-2:  #8A8175;
+    --rule:     #C9C0AE;
+    --rule-2:   #AEA48E;
+    --accent:   #B83227;   /* evidence red */
+    --positive: #2F6A4A;   /* verified green */
+    --caution:  #B8842E;   /* probabilistic amber */
+    --shadow:   0 1px 0 rgba(26,24,20,0.06), 0 24px 60px -30px rgba(26,24,20,0.30);
+
+    /* type scale @ 1920×1080 */
+    --type-display:  168px;
+    --type-title:    88px;
+    --type-h2:       64px;
+    --type-subtitle: 42px;
+    --type-body:     30px;
+    --type-small:    24px;
+    --type-eyebrow:  24px;
+    --type-meta:     24px;
+
+    /* spacing */
+    --pad-top:    96px;
+    --pad-bottom: 96px;
+    --pad-x:      120px;
+    --gap-title:  48px;
+    --gap-item:   28px;
+  }
+
+  html, body {
+    margin: 0;
+    background: #000;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Image slots · drop-targets the user fills in */
+  image-slot {
+    --slot-bg: var(--paper-3);
+    --slot-border: var(--rule-2);
+    --slot-fg: var(--muted);
+    background: var(--slot-bg);
+    border: 1.5px dashed var(--slot-border);
+    color: var(--slot-fg);
+    display: block;
+    position: relative;
+    overflow: hidden;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  image-slot::part(placeholder) {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 22px;
+    color: var(--muted);
+    text-align: center;
+    padding: 12px;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+  }
+  .slot-note {
+    margin-top: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+  }
+  .slot-note .tag {
+    color: var(--accent);
+    margin-right: 8px;
+    font-size: 24px;
+  }
+
+  /* ── shared slide chrome ───────────────────────────────────────── */
+
+  .slide {
+    background: var(--paper);
+    color: var(--ink);
+    overflow: hidden;
+  }
+  .slide.dark { background: var(--ink); color: var(--paper); }
+  .slide.paper-2 { background: var(--paper-2); }
+
+  .frame {
+    position: absolute;
+    inset: 0;
+    padding: var(--pad-top) var(--pad-x) var(--pad-bottom);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* editorial top bar · file slug, page number, section */
+  .topbar {
+    position: absolute;
+    top: 48px;
+    left: var(--pad-x);
+    right: var(--pad-x);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: var(--type-meta);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .slide.dark .topbar { color: #9A9182; }
+  .topbar .slug   { display: flex; gap: 18px; align-items: baseline; }
+  .topbar .slug b { color: var(--ink); font-weight: 500; }
+  .slide.dark .topbar .slug b { color: var(--paper); }
+  .topbar .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+    margin: 0 24px;
+  }
+  .slide.dark .topbar .rule { background: #3A352D; }
+
+  .footbar {
+    position: absolute;
+    bottom: 44px;
+    left: var(--pad-x);
+    right: var(--pad-x);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: var(--type-meta);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .slide.dark .footbar { color: #9A9182; }
+  .footbar .sources { max-width: 65%; text-transform: none; letter-spacing: 0.02em; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: var(--type-eyebrow);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1.title {
+    font-family: "Instrument Serif", "IBM Plex Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: var(--type-title);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1.title em { font-style: italic; color: var(--accent); }
+  .slide.dark h1.title em { color: #F2A398; }
+
+  h2.h2 {
+    font-family: "Instrument Serif", "IBM Plex Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: var(--type-h2);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .lede {
+    font-family: "Instrument Serif", "IBM Plex Serif", Georgia, serif;
+    font-style: italic;
+    font-size: var(--type-subtitle);
+    line-height: 1.2;
+    color: var(--ink-2);
+    margin: 0;
+    text-wrap: pretty;
+  }
+  .slide.dark .lede { color: #D9D2C2; }
+
+  .body { font-size: var(--type-body); line-height: 1.35; color: var(--ink-2); }
+  .small { font-size: var(--type-small); line-height: 1.35; color: var(--muted); }
+
+  .mono { font-family: "IBM Plex Mono", monospace; }
+
+  /* ── slide-entry stagger driver ────────────────────────────────── */
+  /* animations only run when the slide is the active one, so re-visits replay */
+  [data-deck-active] .ani {
+    animation: enter 700ms cubic-bezier(.2,.7,.2,1) both;
+  }
+  @keyframes enter {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  [data-deck-active] .ani-d1  { animation-delay: 80ms;  }
+  [data-deck-active] .ani-d2  { animation-delay: 180ms; }
+  [data-deck-active] .ani-d3  { animation-delay: 280ms; }
+  [data-deck-active] .ani-d4  { animation-delay: 380ms; }
+  [data-deck-active] .ani-d5  { animation-delay: 480ms; }
+  [data-deck-active] .ani-d6  { animation-delay: 580ms; }
+  [data-deck-active] .ani-d7  { animation-delay: 680ms; }
+  [data-deck-active] .ani-d8  { animation-delay: 780ms; }
+  [data-deck-active] .ani-d9  { animation-delay: 880ms; }
+  [data-deck-active] .ani-d10 { animation-delay: 980ms; }
+
+  /* tag pills */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: var(--type-small);
+    color: var(--ink-2);
+    background: rgba(255,255,255,0.35);
+  }
+  .pill.accent { color: var(--accent); border-color: rgba(184,50,39,0.35); background: rgba(184,50,39,0.06); }
+  .pill.pos    { color: var(--positive); border-color: rgba(47,106,74,0.35); background: rgba(47,106,74,0.06); }
+  .pill.cau    { color: var(--caution);  border-color: rgba(184,132,46,0.35); background: rgba(184,132,46,0.06); }
+
+  .dotpos, .dotneu, .dotcau, .dotneg {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    vertical-align: middle;
+  }
+  .dotpos { background: var(--positive); }
+  .dotcau { background: var(--caution); }
+  .dotneg { background: var(--accent); }
+  .dotneu { background: var(--muted); }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 1 · Hook
+     ─────────────────────────────────────────────────────────────── */
+
+  .s1-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 80px;
+    height: 100%;
+    align-items: center;
+  }
+  .s1-eyebrow { margin-bottom: 36px; }
+  .s1-title { font-size: 132px; line-height: 0.98; }
+  .s1-sub { margin-top: 36px; font-size: 36px; max-width: 720px; }
+
+  .uploads {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    align-items: end;
+  }
+  .upload {
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+    position: relative;
+    aspect-ratio: 3 / 4;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .upload .head {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .upload .label {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-size: 30px; line-height: 1.1; color: var(--ink);
+  }
+  .upload .filename {
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--muted-2);
+    word-break: break-all;
+  }
+  .upload .stamp {
+    position: absolute;
+    top: 32px; right: -24px;
+    transform: rotate(8deg);
+    border: 2.5px solid;
+    padding: 8px 18px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    letter-spacing: 0.2em;
+    font-weight: 600;
+    opacity: 0;
+  }
+  [data-deck-active] .upload .stamp { animation: stampIn 600ms ease-out both; }
+  .upload:nth-child(1) .stamp { animation-delay: 900ms !important;  color: var(--accent); }
+  .upload:nth-child(2) .stamp { animation-delay: 1150ms !important; color: var(--positive); }
+  .upload:nth-child(3) .stamp { animation-delay: 1400ms !important; color: var(--caution); }
+  @keyframes stampIn {
+    from { opacity: 0; transform: rotate(8deg) scale(1.3); }
+    to   { opacity: 0.92; transform: rotate(8deg) scale(1); }
+  }
+  .upload .icon {
+    width: 96px; height: 96px;
+    border: 1px solid var(--rule); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    align-self: flex-start;
+    margin-top: 12px;
+    color: var(--muted);
+  }
+
+  /* simple SVG-built thumbnails */
+  .thumb-art {
+    flex: 1;
+    margin: 18px -2px 10px;
+    background: var(--paper-3);
+    border: 1px dashed var(--rule-2);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+  .thumb-art.video::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, transparent 40%, rgba(26,24,20,0.18) 100%),
+      radial-gradient(circle at 50% 38%, #C9BDA4 0 28%, #B3A685 28% 35%, transparent 36%),
+      radial-gradient(circle at 50% 82%, #B3A685 0 38%, transparent 38%);
+  }
+  .thumb-art.video::after {
+    content: ""; position: absolute; left: 12px; top: 12px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 4px rgba(184,50,39,0.18);
+  }
+  .thumb-art.pdf {
+    background:
+      repeating-linear-gradient(180deg, transparent 0 22px, rgba(107,98,88,0.18) 22px 23px),
+      var(--paper-3);
+  }
+  .thumb-art.pdf::after {
+    content: "✕";
+    position: absolute; right: 14px; bottom: 12px;
+    font-family: "Instrument Serif", serif; font-size: 64px; color: rgba(26,24,20,0.4);
+    line-height: 1;
+  }
+  .thumb-art.photo {
+    background:
+      linear-gradient(135deg, #B79D6D 0%, #9A8455 40%, #6E5C3A 100%);
+  }
+  .thumb-art.photo::after {
+    content: ""; position: absolute; left: 30%; top: 50%;
+    width: 36%; height: 24%; border-radius: 50%;
+    background: rgba(241,236,226,0.78);
+    filter: blur(2px);
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 2 · Where forgery enters
+     ─────────────────────────────────────────────────────────────── */
+
+  .s2-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 22px;
+    margin-top: 50px;
+    flex: 1;
+    min-height: 0;
+  }
+  .surface {
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 22px;
+    background: rgba(255,255,255,0.4);
+    display: flex; flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  .surface .num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+  .surface h3 {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 36px;
+    margin: 0;
+    line-height: 1.05;
+  }
+  .surface image-slot {
+    flex: 1;
+    min-height: 260px;
+  }
+  .surface .threat {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
+  }
+  .surface .threat b { color: var(--accent); font-weight: 500; }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 3 · Three threats
+     ─────────────────────────────────────────────────────────────── */
+
+  .s3-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; flex: 1; margin-top: 40px; min-height: 0; }
+  .s3-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .s3-col .num {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-size: 110px; line-height: 0.95; color: var(--accent);
+  }
+  .s3-col .kicker {
+    font-family: "IBM Plex Mono", monospace;
+    text-transform: uppercase;
+    font-size: 24px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .s3-col h3 {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 64px;
+    margin: 0 0 4px;
+    line-height: 1;
+  }
+  .s3-col image-slot {
+    flex: 1;
+    min-height: 360px;
+    margin-top: 12px;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 4 · Five-layer stack (hero)
+     ─────────────────────────────────────────────────────────────── */
+
+  .s4 {
+    display: grid;
+    grid-template-columns: 1.05fr 1.5fr;
+    gap: 80px;
+    flex: 1;
+    align-items: center;
+  }
+  .s4 .lhs h1 { margin-bottom: 36px; font-size: 68px; }
+  .s4 .lhs .lede { max-width: 540px; font-size: 32px; }
+  .s4 .axis {
+    margin-top: 56px;
+    display: flex; flex-direction: column; gap: 16px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .s4 .axis .row { display: flex; align-items: center; gap: 14px; }
+
+  .stack {
+    display: flex; flex-direction: column;
+    gap: 16px;
+    position: relative;
+  }
+  .layer {
+    display: grid;
+    grid-template-columns: 80px 1fr 220px;
+    align-items: center;
+    gap: 28px;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--positive);
+    padding: 22px 28px;
+    border-radius: 3px;
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+  [data-deck-active] .layer { animation: stackIn 700ms cubic-bezier(.2,.7,.2,1) both; }
+  .layer:nth-child(1) { animation-delay: 150ms !important; }
+  .layer:nth-child(2) { animation-delay: 320ms !important; }
+  .layer:nth-child(3) { animation-delay: 490ms !important; }
+  .layer:nth-child(4) { animation-delay: 660ms !important; }
+  .layer:nth-child(5) { animation-delay: 830ms !important; }
+  @keyframes stackIn {
+    from { opacity: 0; transform: translateX(-40px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .layer .lid {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .layer .name {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-size: 40px;
+    line-height: 1.05;
+  }
+  .layer .name small {
+    display: block;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-style: normal;
+    font-size: 24px;
+    color: var(--muted);
+    letter-spacing: 0;
+    margin-top: 6px;
+    text-transform: none;
+  }
+  .layer .tag {
+    text-align: right;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--positive);
+  }
+  .layer.probabilistic { border-left-color: var(--caution); }
+  .layer.probabilistic .tag { color: var(--caution); }
+  .layer.context { border-left-color: var(--ink-2); }
+  .layer.context .tag { color: var(--ink-2); }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 5 · Provenance (C2PA + SynthID)
+     ─────────────────────────────────────────────────────────────── */
+
+  .s5 { display: grid; grid-template-columns: 1fr 1.05fr; gap: 80px; flex: 1; align-items: center; }
+  .s5 h1 { font-size: 72px; }
+  .manifest {
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 32px;
+    box-shadow: var(--shadow);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    line-height: 1.55;
+    position: relative;
+  }
+  .manifest .label {
+    position: absolute; top: -16px; left: 24px;
+    background: var(--paper);
+    padding: 0 12px;
+    font-size: 24px; letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .manifest .row { display: flex; gap: 18px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed var(--rule); }
+  .manifest .row:last-child { border-bottom: 0; }
+  .manifest .k { color: var(--muted); min-width: 200px; }
+  .manifest .v { color: var(--ink); }
+  .manifest .v.green { color: var(--positive); }
+  .manifest .seal {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--positive);
+  }
+  .manifest .badge {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--positive); position: relative;
+  }
+  .manifest .badge::after {
+    content: ""; position: absolute; inset: 3px;
+    border: 2px solid var(--paper); border-top: 0; border-right: 0;
+    transform: rotate(-45deg);
+  }
+
+  .synth {
+    margin-top: 28px;
+    display: flex; align-items: center; gap: 18px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    color: var(--muted);
+  }
+  .synth .watermark {
+    width: 56px; height: 56px;
+    background:
+      repeating-linear-gradient(45deg, rgba(184,50,39,0.32) 0 2px, transparent 2px 5px),
+      repeating-linear-gradient(-45deg, rgba(47,106,74,0.28) 0 2px, transparent 2px 5px),
+      var(--paper-3);
+    border: 1px solid var(--rule);
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 6 · Triage terminal
+     ─────────────────────────────────────────────────────────────── */
+
+  .s6 { display: grid; grid-template-columns: 1.1fr 1.4fr; gap: 70px; flex: 1; align-items: center; }
+  .s6 h1 { font-size: 72px; }
+  .s6 .lhs h1 { margin-bottom: 28px; }
+  .s6 .tool-list { margin-top: 36px; display: flex; flex-direction: column; gap: 18px; }
+  .s6 .tool-list .row {
+    display: grid; grid-template-columns: 200px 1fr; align-items: baseline; gap: 24px;
+    border-top: 1px solid var(--rule); padding-top: 14px;
+    font-size: 24px; color: var(--ink-2);
+  }
+  .s6 .tool-list .tool {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--accent);
+    font-size: 24px;
+  }
+
+  .term {
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    line-height: 1.55;
+    overflow: hidden;
+  }
+  .term .chrome {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 18px;
+    background: #100E0B;
+    border-bottom: 1px solid #2A2620;
+  }
+  .term .chrome .dot { width: 12px; height: 12px; border-radius: 50%; background: #3A352D; }
+  .term .chrome .dot:nth-child(1) { background: #E36A5F; }
+  .term .chrome .dot:nth-child(2) { background: #E4B341; }
+  .term .chrome .dot:nth-child(3) { background: #6CA77A; }
+  .term .chrome .path {
+    margin-left: 14px; font-size: 24px; color: #9A9182;
+    letter-spacing: 0.04em;
+  }
+  .term .body { padding: 24px 28px 28px; }
+  .term .line { display: block; opacity: 0; }
+  .term .prompt { color: #6CA77A; }
+  .term .cmd { color: var(--paper); }
+  .term .out  { color: #9A9182; }
+  .term .ok   { color: #6CA77A; }
+  .term .warn { color: #E4B341; }
+  .term .err  { color: #E36A5F; }
+  .term .dim  { color: #5F584D; }
+
+  [data-deck-active] .term .line { animation: lineIn 280ms ease-out both; }
+  .term .l1 { animation-delay: 300ms !important; }
+  .term .l2 { animation-delay: 700ms !important; }
+  .term .l3 { animation-delay: 850ms !important; }
+  .term .l4 { animation-delay: 1000ms !important; }
+  .term .l5 { animation-delay: 1300ms !important; }
+  .term .l6 { animation-delay: 1450ms !important; }
+  .term .l7 { animation-delay: 1600ms !important; }
+  .term .l8 { animation-delay: 1900ms !important; }
+  .term .l9 { animation-delay: 2050ms !important; }
+  .term .l10 { animation-delay: 2200ms !important; }
+  .term .l11 { animation-delay: 2350ms !important; }
+  .term .l12 { animation-delay: 2700ms !important; }
+  .term .l13 { animation-delay: 2850ms !important; }
+  .term .l14 { animation-delay: 3000ms !important; }
+  @keyframes lineIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .term .caret {
+    display: inline-block; width: 10px; height: 1.05em;
+    background: var(--paper); vertical-align: -3px;
+    animation: blink 900ms steps(2) infinite;
+    margin-left: 4px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 7 · Passive forensics
+     ─────────────────────────────────────────────────────────────── */
+
+  .s7 { display: grid; grid-template-columns: 1fr 1.1fr; gap: 80px; flex: 1; align-items: center; }
+  .s7 h1 { margin-bottom: 28px; font-size: 72px; }
+  .s7 .clues { display: flex; flex-direction: column; gap: 22px; margin-top: 36px; }
+  .s7 .clue {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 24px;
+    padding: 24px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .s7 .clue:last-child { border-bottom: 1px solid var(--rule); }
+  .s7 .clue .id {
+    font-family: "IBM Plex Mono", monospace; color: var(--muted);
+    font-size: 24px;
+  }
+  .s7 .clue h3 {
+    font-family: "Instrument Serif", serif; font-weight: 400;
+    font-style: italic;
+    font-size: 38px; margin: 0 0 6px;
+  }
+  .s7 .clue p { font-size: 24px; color: var(--ink-2); margin: 0; line-height: 1.4; }
+
+  .scene {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .scene .sky {
+    position: absolute; left: 0; right: 0; top: 0; height: 65%;
+    background: linear-gradient(180deg, #D5C9AE 0%, #C9BDA4 100%);
+  }
+  .scene .ground {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 35%;
+    background: linear-gradient(180deg, #8A7E62 0%, #5C513C 100%);
+  }
+  .scene .sun {
+    position: absolute; right: 12%; top: 14%;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #E4D6B5;
+    box-shadow: 0 0 60px 14px rgba(228,214,181,0.6);
+  }
+  .scene .figA, .scene .figB {
+    position: absolute; bottom: 28%;
+    width: 60px; height: 200px;
+    background: linear-gradient(180deg, #2C2823 0%, #1A1814 100%);
+    border-radius: 30px 30px 8px 8px;
+  }
+  .scene .figA { left: 24%; }
+  .scene .figB { left: 58%; }
+  .scene .shA, .scene .shB {
+    position: absolute; bottom: 24%; height: 12px;
+    background: rgba(26,24,20,0.55);
+    border-radius: 50%;
+    filter: blur(4px);
+  }
+  /* shadow A points left (consistent with sun at right) */
+  .scene .shA { left: 14%; width: 120px; transform: skewX(-26deg); }
+  /* shadow B points RIGHT · inconsistent! */
+  .scene .shB { left: 58%; width: 110px; transform: skewX(26deg); }
+
+  .scene .annotateA, .scene .annotateB {
+    position: absolute;
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    opacity: 0;
+  }
+  [data-deck-active] .scene .annotateA { animation: anno 600ms ease-out 800ms both; }
+  [data-deck-active] .scene .annotateB { animation: anno 600ms ease-out 1300ms both; }
+  @keyframes anno {
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .scene .annotateA { left: 10%; bottom: 18%; width: 28%; height: 14%; }
+  .scene .annotateB { left: 52%; bottom: 18%; width: 28%; height: 14%; }
+  .scene .annoLabel {
+    position: absolute;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; letter-spacing: 0.1em;
+    color: var(--accent);
+    background: var(--paper);
+    padding: 4px 10px;
+    text-transform: uppercase;
+  }
+  .scene .lA { top: -32px; left: -2px; }
+  .scene .lB { top: -32px; left: -2px; }
+  .scene .arrow {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+  }
+  [data-deck-active] .scene .arrow { animation: enter 600ms ease-out 1700ms both; }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 8 · Detectors aren't solved (benchmark)
+     ─────────────────────────────────────────────────────────────── */
+
+  .s8 { display: grid; grid-template-columns: 1fr 1.15fr; gap: 80px; flex: 1; align-items: center; }
+  .s8 h1 { margin-bottom: 24px; font-size: 72px; }
+  .s8 .bullets { margin-top: 36px; display: flex; flex-direction: column; gap: 18px; }
+  .s8 .bullets .b {
+    display: grid; grid-template-columns: 40px 1fr; gap: 16px;
+    font-size: 24px; color: var(--ink-2); line-height: 1.4;
+    padding: 14px 0; border-top: 1px solid var(--rule);
+  }
+  .s8 .bullets .b:last-child { border-bottom: 1px solid var(--rule); }
+  .s8 .bullets .b .x {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--accent); font-size: 26px;
+  }
+  .s8 .bullets b { font-weight: 600; color: var(--ink); }
+
+  .chart {
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 36px 40px 32px;
+    box-shadow: var(--shadow);
+  }
+  .chart .head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 28px;
+  }
+  .chart .head h3 {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-weight: 400; font-size: 36px; margin: 0;
+  }
+  .chart .head .meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; color: var(--muted); letter-spacing: 0.06em;
+  }
+  .chart .axisY {
+    position: absolute; left: -8px; top: 50%;
+    transform: rotate(-90deg) translateX(50%);
+    transform-origin: left top;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px;
+    color: var(--muted); letter-spacing: 0.1em;
+  }
+  .chart .plot { position: relative; height: 320px; display: flex; align-items: flex-end; gap: 28px; padding: 0 20px 0 40px; border-bottom: 1px solid var(--ink-2); border-left: 1px solid var(--ink-2); }
+  .chart .pair { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; height: 100%; justify-content: flex-end; position: relative; }
+  .chart .pair .bars { display: flex; gap: 12px; align-items: flex-end; height: 100%; width: 100%; justify-content: center; }
+  .chart .bar {
+    width: 38px; background: var(--ink-2); position: relative;
+    transform-origin: bottom; transform: scaleY(0);
+  }
+  .chart .bar.benchmark { background: var(--positive); }
+  .chart .bar.wild      { background: var(--accent); }
+  [data-deck-active] .chart .bar { animation: barGrow 900ms cubic-bezier(.2,.7,.2,1) both; }
+  .chart .pair:nth-child(1) .bar.benchmark { animation-delay: 300ms !important; }
+  .chart .pair:nth-child(1) .bar.wild      { animation-delay: 450ms !important; }
+  .chart .pair:nth-child(2) .bar.benchmark { animation-delay: 550ms !important; }
+  .chart .pair:nth-child(2) .bar.wild      { animation-delay: 700ms !important; }
+  .chart .pair:nth-child(3) .bar.benchmark { animation-delay: 800ms !important; }
+  .chart .pair:nth-child(3) .bar.wild      { animation-delay: 950ms !important; }
+  @keyframes barGrow {
+    from { transform: scaleY(0); }
+    to   { transform: scaleY(1); }
+  }
+  .chart .pair .num {
+    position: absolute;
+    top: -40px;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--ink);
+    opacity: 0;
+  }
+  [data-deck-active] .chart .num { animation: enter 400ms ease-out both; }
+  .chart .pair:nth-child(1) .num.b { animation-delay: 1100ms !important; left: calc(50% - 60px); }
+  .chart .pair:nth-child(1) .num.w { animation-delay: 1250ms !important; left: calc(50% + 6px); }
+  .chart .pair:nth-child(2) .num.b { animation-delay: 1350ms !important; left: calc(50% - 60px); }
+  .chart .pair:nth-child(2) .num.w { animation-delay: 1500ms !important; left: calc(50% + 6px); }
+  .chart .pair:nth-child(3) .num.b { animation-delay: 1600ms !important; left: calc(50% - 60px); }
+  .chart .pair:nth-child(3) .num.w { animation-delay: 1750ms !important; left: calc(50% + 6px); }
+  .chart .labels {
+    display: flex; padding: 14px 20px 0 40px; gap: 28px;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--ink-2);
+  }
+  .chart .labels span { flex: 1; text-align: center; }
+  .chart .legend {
+    margin-top: 18px; display: flex; gap: 28px; align-items: center;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--muted);
+    border-top: 1px solid var(--rule); padding-top: 18px;
+  }
+  .chart .legend .sw { display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-right: 8px; }
+  .chart .yticks {
+    position: absolute; left: 0px; top: 0; bottom: 0; width: 36px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--muted);
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 9 · Context & corroboration
+     ─────────────────────────────────────────────────────────────── */
+
+  .s9 { display: grid; grid-template-columns: 1fr 1.05fr; gap: 80px; flex: 1; align-items: center; }
+  .s9 h1 { margin-bottom: 24px; font-size: 72px; }
+  .s9 .lede { max-width: 600px; }
+  .s9 .tools-grid {
+    margin-top: 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  }
+  .s9 .toolcard {
+    border: 1px solid var(--rule); padding: 18px 22px;
+    background: rgba(255,255,255,0.45);
+  }
+  .s9 .toolcard .n { font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--accent); letter-spacing: 0.08em; }
+  .s9 .toolcard .t { font-family: "Instrument Serif", serif; font-style: italic; font-size: 32px; margin-top: 4px; }
+  .s9 .toolcard .d { font-size: 24px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+
+  .reverse {
+    position: relative;
+    height: 600px;
+    background: rgba(255,255,255,0.45);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 36px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .reverse .center {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px; height: 200px;
+    border: 2px solid var(--accent);
+    border-radius: 3px;
+    background: linear-gradient(135deg, #B79D6D 0%, #6E5C3A 100%);
+    box-shadow: 0 0 0 6px rgba(184,50,39,0.12);
+  }
+  .reverse .center::after {
+    content: "QUERY";
+    position: absolute; top: -40px; left: 0;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px;
+    color: var(--accent); letter-spacing: 0.18em;
+  }
+  .reverse .match {
+    position: absolute;
+    width: 100px; height: 100px;
+    background: linear-gradient(135deg, #B79D6D 0%, #6E5C3A 100%);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    opacity: 0;
+  }
+  .reverse .match .label {
+    position: absolute; bottom: -32px; left: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  [data-deck-active] .reverse .match { animation: matchIn 700ms ease-out both; }
+  .reverse .m1 { top: 60px;  left: 80px;  animation-delay: 900ms !important; }
+  .reverse .m2 { top: 80px;  right: 70px; animation-delay: 1100ms !important; }
+  .reverse .m3 { bottom: 70px; left: 60px; animation-delay: 1300ms !important; }
+  .reverse .m4 { bottom: 50px; right: 90px; animation-delay: 1500ms !important; }
+  .reverse .m5 { top: 240px; right: 30px; animation-delay: 1700ms !important; width: 80px; height: 80px; }
+  @keyframes matchIn {
+    from { opacity: 0; transform: scale(0.6); }
+    to   { opacity: 0.85; transform: scale(1); }
+  }
+  .reverse svg.lines {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .reverse svg.lines path {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+    stroke-dashoffset: 200;
+    opacity: 0.5;
+  }
+  [data-deck-active] .reverse svg.lines path { animation: drawLine 700ms ease-out 1000ms both; }
+  @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 10 · Documents
+     ─────────────────────────────────────────────────────────────── */
+
+  .s10 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; flex: 1; margin-top: 32px; min-height: 0; }
+  .lane {
+    border: 1px solid var(--rule);
+    background: rgba(255,255,255,0.45);
+    padding: 26px 32px 24px;
+    display: flex; flex-direction: column;
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    gap: 14px;
+    min-width: 0;
+  }
+  .lane image-slot {
+    width: 100%;
+    aspect-ratio: 4 / 2.2;
+    margin: 4px 0 6px;
+  }
+  .lane .topband {
+    font-family: "IBM Plex Mono", monospace; font-size: 24px;
+    text-transform: uppercase; letter-spacing: 0.14em;
+    padding-bottom: 10px; border-bottom: 1px solid var(--rule);
+    margin-bottom: 18px;
+  }
+  .lane.signed .topband { color: var(--positive); }
+  .lane.scanned .topband { color: var(--caution); }
+  .lane h3 {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-weight: 400; font-size: 44px; margin: 0; line-height: 1;
+  }
+  .lane .steps { display: flex; flex-direction: column; gap: 2px; }
+  .lane .step {
+    display: grid; grid-template-columns: 1fr 130px; align-items: center;
+    gap: 14px;
+    padding: 10px 0;
+    border-top: 1px solid var(--rule);
+    font-size: 24px;
+    line-height: 1.3;
+  }
+  .lane .step:last-child { border-bottom: 1px solid var(--rule); }
+  .lane .step .id {
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--muted);
+  }
+  .lane .step .stat {
+    text-align: right;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .lane.signed   .step .stat { color: var(--positive); }
+  .lane.scanned  .step .stat { color: var(--caution); }
+  .lane .takeaway {
+    margin-top: 10px; padding-top: 14px;
+    border-top: 1px solid var(--rule);
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-size: 24px; color: var(--ink-2);
+    line-height: 1.25;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 11 · Reference architecture
+     ─────────────────────────────────────────────────────────────── */
+
+  .s11 { flex: 1; display: flex; flex-direction: column; }
+  .s11 .top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 56px; }
+  .s11 .top h1 { max-width: 1100px; }
+  .s11 .legend {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; color: var(--muted);
+    text-align: right;
+    line-height: 1.5;
+  }
+  .pipeline {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px;
+    align-items: stretch;
+  }
+  .node {
+    border: 1px solid var(--rule);
+    background: rgba(255,255,255,0.55);
+    padding: 22px 18px;
+    border-radius: 4px;
+    display: flex; flex-direction: column; gap: 10px;
+    min-height: 240px;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  .node .n {
+    font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  .node h4 {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-weight: 400; font-size: 30px; margin: 0; line-height: 1.05;
+  }
+  .node .det { font-family: "IBM Plex Mono", monospace; font-size: 24px; color: var(--muted); margin-top: auto; line-height: 1.4; }
+  .node.guard { border-color: var(--accent); background: rgba(184,50,39,0.05); }
+  .node.guard .n { color: var(--accent); }
+  .node.brain { border-color: var(--positive); background: rgba(47,106,74,0.05); }
+  .node.brain .n { color: var(--positive); }
+
+  /* arrow stream */
+  .pipeline .arrows {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .packet {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(184,50,39,0.18);
+    top: 50%; left: 0;
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  [data-deck-active] .packet { animation: pktFlow 4200ms cubic-bezier(.4,0,.6,1) infinite both; }
+  .packet.p2 { animation-delay: 1400ms !important; }
+  .packet.p3 { animation-delay: 2800ms !important; }
+  @keyframes pktFlow {
+    0%   { left: 0%;   opacity: 0; }
+    8%   { opacity: 1; }
+    92%  { opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+  }
+
+  .pipeline .decision-row {
+    margin-top: 36px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px;
+  }
+  .decision {
+    border: 1px solid var(--rule);
+    padding: 16px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    background: rgba(255,255,255,0.45);
+  }
+  .decision .lbl { text-transform: uppercase; letter-spacing: 0.1em; }
+  .decision.allow    { color: var(--positive); border-left: 4px solid var(--positive); }
+  .decision.friction { color: var(--caution);  border-left: 4px solid var(--caution); }
+  .decision.review   { color: var(--ink-2);    border-left: 4px solid var(--ink-2); }
+  .decision.reject   { color: var(--accent);   border-left: 4px solid var(--accent); }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 12 · Analyst surface
+     ─────────────────────────────────────────────────────────────── */
+
+  .s12 { flex: 1; display: grid; grid-template-columns: 0.85fr 1.4fr; gap: 60px; align-items: center; min-height: 0; }
+  .s12 h1 { margin-bottom: 24px; font-size: 68px; }
+  .s12 .principles { margin-top: 36px; display: flex; flex-direction: column; gap: 20px; }
+  .s12 .princ { display: grid; grid-template-columns: 40px 1fr; gap: 16px; font-size: 24px; color: var(--ink-2); line-height: 1.4; }
+  .s12 .princ .id { font-family: "IBM Plex Mono", monospace; color: var(--accent); font-size: 24px; }
+
+  .console {
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 6px;
+    box-shadow: 0 30px 80px -30px rgba(0,0,0,0.7);
+    overflow: hidden;
+  }
+  .console .topbar2 {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 26px;
+    background: #0F0D0A;
+    border-bottom: 1px solid #2A2620;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9A9182;
+  }
+  .console .topbar2 b { color: var(--paper); font-weight: 500; }
+  .console .topbar2 .id { color: #E36A5F; }
+  .console .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 0;
+  }
+  .console .preview {
+    background: linear-gradient(135deg, #2A2620, #0F0D0A);
+    border-right: 1px solid #2A2620;
+    padding: 22px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .console .preview .img {
+    aspect-ratio: 3/4;
+    background: linear-gradient(135deg, #B79D6D 0%, #6E5C3A 100%);
+    border-radius: 3px;
+  }
+  .console .preview .meta { font-family: "IBM Plex Mono", monospace; font-size: 24px; color: #9A9182; line-height: 1.55; }
+  .console .preview .meta b { color: var(--paper); font-weight: 500; }
+  .console .cards {
+    padding: 18px 22px 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-content: start;
+  }
+  .ecard {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #2A2620;
+    border-left: 3px solid var(--muted);
+    border-radius: 3px;
+    padding: 12px 16px;
+    opacity: 0; transform: translateY(8px);
+  }
+  [data-deck-active] .ecard { animation: enter 500ms ease-out both; }
+  .ecard.e1 { animation-delay: 400ms !important; }
+  .ecard.e2 { animation-delay: 600ms !important; }
+  .ecard.e3 { animation-delay: 800ms !important; }
+  .ecard.e4 { animation-delay: 1000ms !important; }
+  .ecard.e5 { animation-delay: 1200ms !important; grid-column: span 2; }
+  .ecard .ehead {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: "IBM Plex Mono", monospace; font-size: 24px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: #9A9182;
+    margin-bottom: 4px;
+  }
+  .ecard h5 {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-weight: 400;
+    font-size: 26px; margin: 0 0 4px; color: var(--paper);
+    line-height: 1.1;
+  }
+  .ecard p { font-family: "IBM Plex Mono", monospace; font-size: 24px; color: #B0A99A; margin: 0; line-height: 1.3; }
+  .ecard .stat { font-family: "IBM Plex Mono", monospace; font-size: 24px; font-weight: 600; letter-spacing: 0.06em; }
+
+  .ecard.pos    { border-left-color: var(--positive); }
+  .ecard.pos    .stat { color: #6CA77A; }
+  .ecard.cau    { border-left-color: var(--caution); }
+  .ecard.cau    .stat { color: #E4B341; }
+  .ecard.neg    { border-left-color: var(--accent); }
+  .ecard.neg    .stat { color: #E36A5F; }
+  .ecard.neu    { border-left-color: var(--muted); }
+  .ecard.neu    .stat { color: #9A9182; }
+
+  .console .verdict {
+    grid-column: span 2;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px;
+    background: rgba(228,179,65,0.12);
+    border: 1px solid rgba(228,179,65,0.4);
+    border-radius: 3px;
+    margin-top: 4px;
+  }
+  .console .verdict .label {
+    font-family: "IBM Plex Mono", monospace;
+    text-transform: uppercase; letter-spacing: 0.14em;
+    font-size: 24px; color: #9A9182;
+  }
+  .console .verdict .val {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-size: 28px; color: #E4B341;
+    margin-top: 2px;
+    line-height: 1.15;
+  }
+  .console .verdict .actions { display: flex; gap: 8px; }
+  .console .verdict .btn {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 10px 14px;
+    border: 1px solid #3A352D;
+    background: transparent;
+    color: var(--paper);
+    border-radius: 2px;
+  }
+  .console .verdict .btn.primary {
+    background: #E4B341; color: var(--ink); border-color: #E4B341;
+    font-weight: 600;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SLIDE 13 · CTA
+     ─────────────────────────────────────────────────────────────── */
+
+  .s13 { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .s13 .kicker {
+    font-family: "IBM Plex Mono", monospace;
+    text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--accent);
+    font-size: 28px;
+    margin-bottom: 36px;
+  }
+  .s13 .threeverbs {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    align-items: stretch;
+  }
+  .s13 .verb {
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--rule);
+    border-top: 4px solid var(--accent);
+    border-radius: 2px;
+    padding: 56px 48px 64px;
+    display: flex; flex-direction: column; gap: 24px;
+    min-height: 460px;
+    position: relative;
+  }
+  .s13 .verb .vnum {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px; color: var(--muted); letter-spacing: 0.14em;
+  }
+  .s13 .verb h2 {
+    font-family: "Instrument Serif", serif;
+    font-weight: 400;
+    font-style: italic;
+    font-size: 130px;
+    line-height: 0.95;
+    margin: 0;
+    color: var(--ink);
+  }
+  .s13 .verb h2 .dot { color: var(--accent); }
+  .s13 .verb p {
+    font-size: 24px;
+    color: var(--ink-2);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .s13 .verb .impl {
+    margin-top: auto;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+
+  .s13 .closing {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-size: 44px;
+    color: var(--ink-2);
+    margin-top: 60px;
+    text-wrap: balance;
+    max-width: 1200px;
+  }
+  .s13 .closing b { color: var(--ink); font-weight: 400; }
+
+  /* Tiny utility */
+  .row-rule { height: 1px; background: var(--rule); }
+
+</style>
+
+</head>
+
+<body>
+
+<deck-stage width="1920" height="1080">
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 1 · Hook
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="01 Hook">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>DIGITAL&nbsp;FORENSICS</b><span>A TUTORIAL FOR FDEs</span></div>
+        <div class="rule"></div>
+        <div>FILE&nbsp;01&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s1-grid">
+        <div>
+          <div class="eyebrow ani ani-d1">Lunch &amp; Learn · 30 min</div>
+          <h1 class="title s1-title ani ani-d2">Can your app <em>trust</em><br/>this upload?</h1>
+          <p class="lede s1-sub ani ani-d3">Uploads used to be content to store and parse. They&rsquo;re now <em>claims</em> about reality · and your product has to decide which ones deserve trust.</p>
+        </div>
+
+        <div class="uploads">
+          <div class="upload ani ani-d4">
+            <div class="head"><span>EVIDENCE&nbsp;A</span><span>VIDEO/MP4</span></div>
+            <div class="thumb-art video"></div>
+            <div>
+              <div class="label">Onboarding selfie</div>
+              <div class="filename">liveness_3120.mp4</div>
+            </div>
+            <div class="stamp">UNVERIFIED</div>
+          </div>
+          <div class="upload ani ani-d5">
+            <div class="head"><span>EVIDENCE&nbsp;B</span><span>DOC/PDF</span></div>
+            <div class="thumb-art pdf"></div>
+            <div>
+              <div class="label">Signed contract</div>
+              <div class="filename">msa_acme_v4.pdf</div>
+            </div>
+            <div class="stamp">SIGNED</div>
+          </div>
+          <div class="upload ani ani-d6">
+            <div class="head"><span>EVIDENCE&nbsp;C</span><span>IMG/JPEG</span></div>
+            <div class="thumb-art photo"></div>
+            <div>
+              <div class="label">Viral news photo</div>
+              <div class="filename">IMG_8842.jpg</div>
+            </div>
+            <div class="stamp">CONTESTED</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>2026 · INTERNAL</div>
+        <div class="sources">Trust positive signals more than negative signals.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 2 · Where forgery enters
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="02 Where forgery enters">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>I. PROBLEM SPACE</b><span>WHERE FORGERY ENTERS YOUR PRODUCT</span></div>
+        <div class="rule"></div>
+        <div>02&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="ani ani-d1" style="display: flex; align-items: baseline; gap: 32px;">
+        <div class="eyebrow">For engineers, not investigators</div>
+      </div>
+
+      <h1 class="title ani ani-d2" style="margin-top: 14px; max-width: 1500px; font-size: 76px;">
+        Same forged file. <em>Different problem</em> on every surface.
+      </h1>
+
+      <div class="s2-grid">
+        <div class="surface ani ani-d3">
+          <div class="num">A&middot;01</div>
+          <h3>User-generated content</h3>
+          <image-slot id="s2-ugc" placeholder="Social feed / community post"></image-slot>
+          <div class="threat"><b>moderation &amp; abuse</b></div>
+        </div>
+        <div class="surface ani ani-d4">
+          <div class="num">A&middot;02</div>
+          <h3>Onboarding &amp; KYC</h3>
+          <image-slot id="s2-kyc" placeholder="ID upload &middot; selfie UI"></image-slot>
+          <div class="threat"><b>presentation &amp; injection</b></div>
+        </div>
+        <div class="surface ani ani-d5">
+          <div class="num">A&middot;03</div>
+          <h3>Claims &amp; support</h3>
+          <image-slot id="s2-claims" placeholder="Invoice / receipt / damage photo"></image-slot>
+          <div class="threat"><b>document &amp; expense fraud</b></div>
+        </div>
+        <div class="surface ani ani-d6">
+          <div class="num">A&middot;04</div>
+          <h3>Contracts &amp; legal</h3>
+          <image-slot id="s2-contracts" placeholder="Signed PDF / Docusign UI"></image-slot>
+          <div class="threat"><b>signature &amp; chain-of-custody</b></div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>02&middot;13</div>
+        <div class="sources">NIST SP 800-63-4 · Adobe / Docusign signature guidance</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 3 · Three threats, three disciplines
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide paper-2" data-label="03 Three threats">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>II. TAXONOMY</b><span>THREE THREATS &middot; THREE DISCIPLINES</span></div>
+        <div class="rule"></div>
+        <div>03&nbsp;/&nbsp;13</div>
+      </div>
+
+      <h1 class="title ani ani-d1" style="max-width: 1500px;">
+        Don&rsquo;t collapse this into <em>&ldquo;deepfakes.&rdquo;</em>
+      </h1>
+      <p class="lede ani ani-d2" style="margin-top: 24px; max-width: 1200px;">If you do, your engineering design gets worse. Each category demands a different detection discipline.</p>
+
+      <div class="s3-cols">
+        <div class="s3-col ani ani-d3">
+          <div class="num">01</div>
+          <div class="kicker">Image forensics</div>
+          <h3>Tampering</h3>
+          <image-slot id="s3-tamper" placeholder="Splice / copy-move / erase-fill example"></image-slot>
+        </div>
+
+        <div class="s3-col ani ani-d4">
+          <div class="num">02</div>
+          <div class="kicker">Synthetic media</div>
+          <h3>Deepfakes</h3>
+          <image-slot id="s3-deep" placeholder="Real / fake face pair"></image-slot>
+        </div>
+
+        <div class="s3-col ani ani-d5">
+          <div class="num">03</div>
+          <div class="kicker">Mixed lanes</div>
+          <h3>Document fraud</h3>
+          <image-slot id="s3-doc" placeholder="Forged ID / altered contract"></image-slot>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>03&middot;13</div>
+        <div class="sources">FaceForensics++ · DFDC · NIST 800-63-4 · image-tampering survey literature</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 4 · Five-layer forensic stack (HERO)
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="04 Five-layer stack">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>III. MENTAL MODEL</b><span>THE FIVE-LAYER FORENSIC STACK</span></div>
+        <div class="rule"></div>
+        <div>04&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s4">
+        <div class="lhs">
+          <div class="eyebrow ani ani-d1">The central slide</div>
+          <h1 class="title ani ani-d2" style="margin-top: 24px;">
+            Layered evidence,<br/>not one classifier.
+          </h1>
+          <p class="lede ani ani-d3">Strong systems don&rsquo;t choose between provenance and detection. They combine signals · and trust positive evidence more than negative.</p>
+
+          <div class="axis ani ani-d6">
+            <div class="row"><span class="dotpos"></span> Positive · cryptographically verifiable</div>
+            <div class="row"><span class="dotcau"></span> Probabilistic · learned, degrades over time</div>
+            <div class="row"><span class="dotneu"></span> Context · corroboration, not certainty</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="layer">
+            <div class="lid">L·01</div>
+            <div class="name">Provenance &amp; signatures<small>C2PA manifest · digital signature · SynthID</small></div>
+            <div class="tag">● Positive</div>
+          </div>
+          <div class="layer">
+            <div class="lid">L·02</div>
+            <div class="name">Metadata &amp; container<small>EXIF · stream &amp; codec · PDF structure</small></div>
+            <div class="tag">● Positive</div>
+          </div>
+          <div class="layer probabilistic">
+            <div class="lid">L·03</div>
+            <div class="name">Passive forensic clues<small>JPEG history · shadows · waveform</small></div>
+            <div class="tag">● Probabilistic</div>
+          </div>
+          <div class="layer probabilistic">
+            <div class="lid">L·04</div>
+            <div class="name">Model-based detectors<small>FaceForensics · ASVspoof · vendor APIs</small></div>
+            <div class="tag">● Probabilistic</div>
+          </div>
+          <div class="layer context">
+            <div class="lid">L·05</div>
+            <div class="name">Context &amp; corroboration<small>reverse search · InVID · workflow</small></div>
+            <div class="tag">● Context</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>04&middot;13</div>
+        <div class="sources">C2PA spec · Farid (CAI) · Deepfake-Eval-2024 · DeepfakeBench</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 5 · Provenance
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="05 Provenance">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>LAYER 01</b><span>PROVENANCE &amp; SIGNATURES</span></div>
+        <div class="rule"></div>
+        <div>05&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s5">
+        <div>
+          <div class="eyebrow ani ani-d1">Positive evidence · cryptographic</div>
+          <h1 class="title ani ani-d2" style="margin-top: 22px;">
+            Ask the file <em>who signed it</em><br/>before asking <em>if it&rsquo;s fake</em>.
+          </h1>
+          <p class="lede ani ani-d3" style="margin-top: 28px; max-width: 580px;">
+            C2PA wraps an asset with a signed manifest. SynthID embeds a watermark before the asset ever leaves the model. Both are forms of proactive proof.
+          </p>
+
+          <div class="ani ani-d5" style="margin-top: 40px; font-size: 24px; color: var(--muted-2); line-height: 1.5; font-family: 'IBM Plex Mono', monospace; max-width: 580px;">
+            <span style="color: var(--accent);">▲</span>&nbsp;&nbsp;<b style="color: var(--ink); font-weight: 500;">CAVEAT.</b> Missing credentials &ne; fake. Adoption is partial, metadata strips in distribution, watermarks degrade.
+          </div>
+        </div>
+
+        <div class="ani ani-d4">
+          <div class="manifest">
+            <div class="label">C2PA · manifest</div>
+            <div class="row"><div class="k">claim_generator</div><div class="v">acme-camera/2.3 · libc2pa/0.46</div></div>
+            <div class="row"><div class="k">signature</div><div class="v green seal"><span class="badge"></span>Valid &middot; trust list · adobe-root</div></div>
+            <div class="row"><div class="k">hard_binding</div><div class="v">sha256 · 0x9c4f…ae71</div></div>
+            <div class="row"><div class="k">assertion · created</div><div class="v">capture · device · 2026-04-12T18:02Z</div></div>
+            <div class="row"><div class="k">assertion · actions</div><div class="v">c2pa.edited · color, c2pa.cropped</div></div>
+            <div class="row"><div class="k">assertion · ai_training</div><div class="v">do-not-train</div></div>
+            <div class="row"><div class="k">soft_binding</div><div class="v">fingerprint · synthid · embedded</div></div>
+          </div>
+
+          <div class="synth">
+            <div class="watermark"></div>
+            <div>
+              <div style="color: var(--ink); font-weight: 500;">SynthID · imperceptible watermark</div>
+              survives crop, filter, recompression
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>05&middot;13</div>
+        <div class="sources">C2PA spec · Content Authenticity Initiative · Google DeepMind SynthID</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 6 · Metadata triage (terminal)
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="06 Metadata triage">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>LAYER 02</b><span>METADATA &amp; CONTAINER</span></div>
+        <div class="rule"></div>
+        <div>06&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s6">
+        <div class="lhs">
+          <div class="eyebrow ani ani-d1">Boring &middot; fast &middot; cheap</div>
+          <h1 class="title ani ani-d2" style="margin-top: 22px;">
+            Read what the file<br/><em>claims about itself</em>.
+          </h1>
+          <p class="lede ani ani-d3" style="margin-top: 24px; max-width: 580px; font-size: 32px;">
+            Five command-line tools cover 90% of the first triage pass · long before any model runs.
+          </p>
+
+          <div class="tool-list ani ani-d5">
+            <div class="row"><div class="tool">exiftool</div><div>Camera, timestamps, edit history, GPS, embedded C2PA</div></div>
+            <div class="row"><div class="tool">ffprobe</div><div>Container, codec, writing-app, timecode, stream JSON</div></div>
+            <div class="row"><div class="tool">mediainfo</div><div>Bit rate, color space, chapters · serverless-friendly</div></div>
+            <div class="row"><div class="tool">qpdf --check</div><div>PDF structural validation &middot; meaningful exit codes</div></div>
+            <div class="row"><div class="tool">pdfid.py</div><div>Suspicious-keyword triage &middot; /JS, /OpenAction, /XFA</div></div>
+          </div>
+        </div>
+
+        <div class="ani ani-d4">
+          <div class="term">
+            <div class="chrome">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="path">~ /forensics/case-3120 &nbsp;·&nbsp; zsh</span>
+            </div>
+            <div class="body">
+              <span class="line l1"><span class="prompt">$</span> <span class="cmd">sha256sum suspicious.mp4</span></span>
+              <span class="line l2"><span class="out">9c4f1…ae71  suspicious.mp4</span></span>
+              <span class="line l3"><span class="prompt">$</span> <span class="cmd">exiftool -j -G1 suspicious.jpg</span></span>
+              <span class="line l4"><span class="out">[ExifIFD] CreateDate    : 2026:04:12 18:02:04</span></span>
+              <span class="line l5"><span class="out">[Composite] GPSPosition  : <span class="warn">missing</span></span></span>
+              <span class="line l6"><span class="out">[XMP-c2pa] Manifest      : <span class="ok">present · valid</span></span></span>
+              <span class="line l7"><span class="prompt">$</span> <span class="cmd">ffprobe -v quiet -show_streams clip.mp4</span></span>
+              <span class="line l8"><span class="out">writing_app : <span class="warn">"HitFilm Express 17"</span></span></span>
+              <span class="line l9"><span class="out">codec       : h264 · yuv420p · 30/1 fps</span></span>
+              <span class="line l10"><span class="prompt">$</span> <span class="cmd">c2patool clip.mp4</span></span>
+              <span class="line l11"><span class="out">manifest    : <span class="ok">verified · signer = acme-cam/2.3</span></span></span>
+              <span class="line l12"><span class="prompt">$</span> <span class="cmd">pdfid.py contract.pdf</span></span>
+              <span class="line l13"><span class="out">/JavaScript : <span class="err">2</span>  &middot;  /OpenAction : <span class="err">1</span>  &middot;  /XFA : 0</span></span>
+              <span class="line l14"><span class="prompt">$</span> <span class="caret"></span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>06&middot;13</div>
+        <div class="sources">ExifTool · FFmpeg/ffprobe · MediaInfo · CAI c2patool · Didier Stevens PDFiD</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 7 · Passive forensics
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide paper-2" data-label="07 Passive forensics">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>LAYER 03</b><span>PASSIVE FORENSIC CLUES</span></div>
+        <div class="rule"></div>
+        <div>07&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s7">
+        <div>
+          <div class="eyebrow ani ani-d1">Probabilistic · pixel-level</div>
+          <h1 class="title ani ani-d2">
+            What did the editor<br/><em>leave behind?</em>
+          </h1>
+
+          <div class="clues">
+            <div class="clue ani ani-d3">
+              <div class="id">C&middot;01</div>
+              <div>
+                <h3>JPEG history</h3>
+                <p>Quantization signatures &amp; double-compression. A re-saved file isn&rsquo;t proof of tampering, but it has a history.</p>
+              </div>
+            </div>
+            <div class="clue ani ani-d4">
+              <div class="id">C&middot;02</div>
+              <div>
+                <h3>Scene physics</h3>
+                <p>Shadows, reflections, vanishing points, lighting. Hard to fake completely.</p>
+              </div>
+            </div>
+            <div class="clue ani ani-d5">
+              <div class="id">C&middot;03</div>
+              <div>
+                <h3>Localization</h3>
+                <p>Which region was tampered. Not a single yes/no label.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ani ani-d6">
+          <image-slot id="s7-scene" placeholder="Shadow / lighting forensic example, or JPEG ELA visualization" style="aspect-ratio: 4/3; width: 100%;"></image-slot>
+          <div class="slot-note"><span class="tag">FIG 07-A</span>Find a scene with shadow / reflection inconsistencies, or an Error-Level-Analysis (ELA) visualization showing a spliced region lighting up.</div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>07&middot;13</div>
+        <div class="sources">Farid · JPEG quantization · multi-scale tamper localization literature</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 8 · Detectors aren't solved
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="08 Detectors arent solved">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>LAYER 04</b><span>MODEL-BASED DETECTORS</span></div>
+        <div class="rule"></div>
+        <div>08&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s8">
+        <div>
+          <div class="eyebrow ani ani-d1">The honest slide</div>
+          <h1 class="title ani ani-d2">
+            Detectors aren&rsquo;t<br/><em>solved.</em>
+          </h1>
+          <p class="lede ani ani-d3" style="margin-top: 24px; max-width: 580px;">Open-source AUC drops sharply on in-the-wild content. Zero-shot generalization to new generators remains a hard, unsolved problem.</p>
+
+          <div class="bullets ani ani-d5">
+            <div class="b"><div class="x">&times;</div><div><b>Generalization.</b> Models trained on yesterday&rsquo;s generators degrade against today&rsquo;s.</div></div>
+            <div class="b"><div class="x">&times;</div><div><b>Distribution drift.</b> Compression, screenshotting, and re-sharing erase the very artifacts detectors rely on.</div></div>
+            <div class="b"><div class="x">&times;</div><div><b>Overconfident UX.</b> A single &ldquo;fake&rdquo; badge teaches users not to think.</div></div>
+          </div>
+        </div>
+
+        <div class="ani ani-d4">
+          <div class="chart">
+            <div class="head">
+              <h3>Detector AUC: benchmark vs. in-the-wild</h3>
+              <div class="meta">FIG 08-A · illustrative</div>
+            </div>
+            <div style="position: relative;">
+              <div class="yticks">
+                <span>1.0</span><span>0.8</span><span>0.6</span><span>0.4</span><span>0.2</span>
+              </div>
+              <div class="plot">
+                <div class="pair">
+                  <div class="bars">
+                    <div class="bar benchmark" style="height: 92%;"></div>
+                    <div class="bar wild"      style="height: 64%;"></div>
+                  </div>
+                  <div class="num b">0.94</div>
+                  <div class="num w">0.65</div>
+                </div>
+                <div class="pair">
+                  <div class="bars">
+                    <div class="bar benchmark" style="height: 88%;"></div>
+                    <div class="bar wild"      style="height: 52%;"></div>
+                  </div>
+                  <div class="num b">0.90</div>
+                  <div class="num w">0.53</div>
+                </div>
+                <div class="pair">
+                  <div class="bars">
+                    <div class="bar benchmark" style="height: 95%;"></div>
+                    <div class="bar wild"      style="height: 58%;"></div>
+                  </div>
+                  <div class="num b">0.97</div>
+                  <div class="num w">0.59</div>
+                </div>
+              </div>
+            </div>
+            <div class="labels">
+              <span>Image · faces</span>
+              <span>Video · faces</span>
+              <span>Audio · ASVspoof</span>
+            </div>
+            <div class="legend">
+              <span><span class="sw" style="background: var(--positive);"></span>Held-out benchmark</span>
+              <span><span class="sw" style="background: var(--accent);"></span>Deepfake-Eval-2024 in-the-wild</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>08&middot;13</div>
+        <div class="sources">Deepfake-Eval-2024 · DeepfakeBench · UC Berkeley generalization (2025) · ASVspoof / AASIST</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 9 · Context & corroboration
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="09 Context">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>LAYER 05</b><span>CONTEXT &amp; CORROBORATION</span></div>
+        <div class="rule"></div>
+        <div>09&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s9">
+        <div>
+          <div class="eyebrow ani ani-d1">Where else has this been?</div>
+          <h1 class="title ani ani-d2">
+            One image,<br/><em>many witnesses.</em>
+          </h1>
+          <p class="lede ani ani-d3" style="margin-top: 24px;">Corroboration turns a probabilistic score into a defensible decision.</p>
+
+          <div class="tools-grid ani ani-d5">
+            <div class="toolcard">
+              <div class="n">T·01</div>
+              <div class="t">InVID plugin</div>
+              <div class="d">Keyframes · reverse · magnifier · forensic filters · metadata, in one browser tool.</div>
+            </div>
+            <div class="toolcard">
+              <div class="n">T·02</div>
+              <div class="t">Google Lens</div>
+              <div class="d">Earliest indexed appearance and alternate crops.</div>
+            </div>
+            <div class="toolcard">
+              <div class="n">T·03</div>
+              <div class="t">Bing Visual</div>
+              <div class="d">Different crawl, different recall · run both.</div>
+            </div>
+            <div class="toolcard">
+              <div class="n">T·04</div>
+              <div class="t">Workflow corroboration</div>
+              <div class="d">Other artifacts in the same case &middot; timestamps &middot; user history.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ani ani-d4">
+          <image-slot id="s9-reverse" placeholder="Reverse image search results &middot; Google Lens / Bing / InVID" style="aspect-ratio: 4/3; width: 100%;"></image-slot>
+          <div class="slot-note"><span class="tag">FIG 09-A</span>Screenshot of Google Lens or Bing visual results showing the same image surfacing across multiple sites &amp; dates, or InVID&rsquo;s reverse-search panel with thumbnail matches.</div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>09&middot;13</div>
+        <div class="sources">InVID Verification Plugin · Google Lens · Bing Visual Search</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 10 · Documents
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="10 Documents">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>IV. SPECIAL CASE</b><span>DOCUMENT FRAUD</span></div>
+        <div class="rule"></div>
+        <div>10&nbsp;/&nbsp;13</div>
+      </div>
+
+      <h1 class="title ani ani-d1" style="max-width: 1500px;">
+        Signed PDF vs. photo of a contract: <em>not the same problem.</em>
+      </h1>
+
+      <div class="s10">
+        <div class="lane signed ani ani-d3">
+          <div class="topband"><span class="dotpos" style="margin-right: 12px;"></span>LANE A &nbsp; · &nbsp; CRYPTOGRAPHIC</div>
+          <h3>Native signed PDF</h3>
+          <image-slot id="s10-signed" placeholder="Acrobat / Docusign signature-validation panel"></image-slot>
+          <div class="steps">
+            <div class="step"><div>Verify signer cert &amp; trust chain</div><div class="stat">verify</div></div>
+            <div class="step"><div>Validate hash over byte ranges</div><div class="stat">verify</div></div>
+            <div class="step"><div>Check timestamp &amp; revocation</div><div class="stat">verify</div></div>
+          </div>
+          <div class="takeaway">Any byte change invalidates the seal.</div>
+        </div>
+
+        <div class="lane scanned ani ani-d4">
+          <div class="topband"><span class="dotcau" style="margin-right: 12px;"></span>LANE B &nbsp; · &nbsp; VISUAL FORENSIC</div>
+          <h3>Photo / scan / flattened PDF</h3>
+          <image-slot id="s10-scanned" placeholder="Photo of paper contract or flattened-PDF page"></image-slot>
+          <div class="steps">
+            <div class="step"><div><tt>qpdf</tt> &amp; <tt>pdfid.py</tt> triage</div><div class="stat">triage</div></div>
+            <div class="step"><div>Visual tamper-localization</div><div class="stat">probabilistic</div></div>
+            <div class="step"><div>OCR cross-check &amp; analyst</div><div class="stat">analyst</div></div>
+          </div>
+          <div class="takeaway">An image case dressed up as a document.</div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>10&middot;13</div>
+        <div class="sources">Adobe Validate Digital Signatures · Docusign tamper-evident seals · qpdf · PDFiD</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 11 · Reference architecture
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide paper-2" data-label="11 Reference architecture">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>V. INTEGRATION</b><span>REFERENCE ARCHITECTURE</span></div>
+        <div class="rule"></div>
+        <div>11&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s11">
+        <div class="top">
+          <div>
+            <div class="eyebrow ani ani-d1">For your web app</div>
+            <h1 class="title ani ani-d2" style="margin-top: 18px;">
+              Preserve first. Analyze second. <em>Decide third.</em>
+            </h1>
+          </div>
+          <div class="legend ani ani-d3">
+            <div><span style="display: inline-block; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; vertical-align: middle; margin-right: 8px;"></span>guard rails</div>
+            <div><span style="display: inline-block; width: 14px; height: 14px; background: var(--positive); border-radius: 50%; vertical-align: middle; margin-right: 8px;"></span>decision brain</div>
+          </div>
+        </div>
+
+        <div class="pipeline ani ani-d4">
+          <div class="node guard">
+            <div class="n">01</div>
+            <h4>Quarantine</h4>
+            <div class="det">Immutable original bytes · sha256 on arrival</div>
+          </div>
+          <div class="node guard">
+            <div class="n">02</div>
+            <h4>Secure scan</h4>
+            <div class="det">OWASP · AV · MIME &amp; type policy</div>
+          </div>
+          <div class="node">
+            <div class="n">03</div>
+            <h4>Extract</h4>
+            <div class="det">Metadata, container, provenance · before transcode</div>
+          </div>
+          <div class="node">
+            <div class="n">04</div>
+            <h4>Detectors</h4>
+            <div class="det">Modality-aware · vendor or in-house</div>
+          </div>
+          <div class="node brain">
+            <div class="n">05</div>
+            <h4>Evidence + policy</h4>
+            <div class="det">Cards &amp; scores feed a 4-way decision</div>
+          </div>
+          <div class="node brain">
+            <div class="n">06</div>
+            <h4>Vault</h4>
+            <div class="det">Original + log + decision · audit-grade</div>
+          </div>
+
+          <div class="arrows">
+            <div class="packet p1"></div>
+            <div class="packet p2"></div>
+            <div class="packet p3"></div>
+          </div>
+        </div>
+
+        <div class="decision-row ani ani-d6">
+          <div class="decision allow"><span class="lbl">Auto-allow</span><span>●</span></div>
+          <div class="decision friction"><span class="lbl">Add friction</span><span>●</span></div>
+          <div class="decision review"><span class="lbl">Analyst review</span><span>●</span></div>
+          <div class="decision reject"><span class="lbl">Reject / reupload</span><span>●</span></div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>11&middot;13</div>
+        <div class="sources">OWASP File Upload Cheat Sheet · NIST SP 800-86 / 800-101 · OSAC digital-image guidance</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 12 · Analyst surface (evidence cards)
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="12 Analyst surface">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>VI. UX</b><span>THE ANALYST SURFACE</span></div>
+        <div class="rule"></div>
+        <div>12&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s12">
+        <div>
+          <div class="eyebrow ani ani-d1">Most failures are product failures</div>
+          <h1 class="title ani ani-d2">
+            Don&rsquo;t ship <em>one badge.</em><br/>Ship <em>evidence cards.</em>
+          </h1>
+
+          <div class="principles ani ani-d4">
+            <div class="princ"><div class="id">P&middot;1</div><div>Show signature, provenance, metadata, detector, and context as <b>independent cards</b>.</div></div>
+            <div class="princ"><div class="id">P&middot;2</div><div>Each card carries <b>its own confidence and provenance</b>; never collapse to a single red/green.</div></div>
+            <div class="princ"><div class="id">P&middot;3</div><div><b>Analysts</b> see all five. <b>Users</b> see what can be explained.</div></div>
+            <div class="princ"><div class="id">P&middot;4</div><div>Decisions: allow, friction, review, reject · not <i>true/false</i>.</div></div>
+          </div>
+        </div>
+
+        <div class="ani ani-d3">
+          <div class="console">
+            <div class="topbar2">
+              <div><b>case</b> · 3120-A &nbsp;·&nbsp; <span class="id">flagged</span> &nbsp;·&nbsp; uploaded 18:02:04Z</div>
+              <div>analyst · m.tanaka</div>
+            </div>
+            <div class="grid">
+              <div class="preview">
+                <div class="img"></div>
+                <div class="meta">
+                  <b>liveness_3120.mp4</b><br/>
+                  20.4MB · h264 · 30fps<br/>
+                  sha256 9c4f1…ae71<br/>
+                  uploader · acct-44213<br/>
+                  ip · geo-mismatch
+                </div>
+              </div>
+              <div class="cards">
+                <div class="ecard e1 cau">
+                  <div class="ehead"><span>L·01 · Provenance</span><span class="stat">PARTIAL</span></div>
+                  <h5>C2PA manifest missing</h5>
+                  <p>not signed · platform doesn't embed</p>
+                </div>
+                <div class="ecard e2 cau">
+                  <div class="ehead"><span>L·02 · Metadata</span><span class="stat">ANOMALY</span></div>
+                  <h5>Writing-app = HitFilm 17</h5>
+                  <p>expected: device-captured · re-rendered timeline</p>
+                </div>
+                <div class="ecard e3 neg">
+                  <div class="ehead"><span>L·03 · Passive</span><span class="stat">HIGH</span></div>
+                  <h5>Lip-sync drift 86ms</h5>
+                  <p>frames 1240–1310 · audio leads video</p>
+                </div>
+                <div class="ecard e4 cau">
+                  <div class="ehead"><span>L·04 · Detector</span><span class="stat">0.71</span></div>
+                  <h5>Synthetic face · likely</h5>
+                  <p>ensemble · 3 of 4 detectors agree</p>
+                </div>
+                <div class="ecard e5 neu">
+                  <div class="ehead"><span>L·05 · Context</span><span class="stat">2 MATCHES</span></div>
+                  <h5>Reverse search · prior appearances</h5>
+                  <p>identical thumbnail seen on stock-image agency catalog · 2024-08 &middot; 2025-02</p>
+                </div>
+                <div class="verdict">
+                  <div>
+                    <div class="label">Policy verdict</div>
+                    <div class="val">Escalate · request liveness step-up</div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn">Allow</button>
+                    <button class="btn primary">Step-up</button>
+                    <button class="btn">Reject</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>12&middot;13</div>
+        <div class="sources">CAI progressive-disclosure model · NIST 800-63-4 · OSAC chain-of-custody</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SLIDE 13 · CTA · Preserve · Verify · Escalate
+       ═════════════════════════════════════════════════════════════ -->
+  <section class="slide" data-label="13 Call to action">
+    <div class="frame">
+      <div class="topbar">
+        <div class="slug"><b>CLOSE</b><span>WHAT TO DO MONDAY</span></div>
+        <div class="rule"></div>
+        <div>13&nbsp;/&nbsp;13</div>
+      </div>
+
+      <div class="s13">
+        <div class="kicker ani ani-d1">If you remember three verbs:</div>
+
+        <div class="threeverbs">
+          <div class="verb ani ani-d2">
+            <div class="vnum">VERB · 01</div>
+            <h2>Preserve<span class="dot">.</span></h2>
+            <p>Quarantine originals &amp; hash on arrival. Never analyze a derivative first.</p>
+            <div class="impl">implement · this quarter</div>
+          </div>
+          <div class="verb ani ani-d3">
+            <div class="vnum">VERB · 02</div>
+            <h2>Verify<span class="dot">.</span></h2>
+            <p>Provenance, signatures, and metadata before any model fires. Positive evidence first.</p>
+            <div class="impl">implement · next quarter</div>
+          </div>
+          <div class="verb ani ani-d4">
+            <div class="vnum">VERB · 03</div>
+            <h2>Escalate<span class="dot">.</span></h2>
+            <p>Benchmark on recent samples. Keep humans in the loop for high-stakes decisions.</p>
+            <div class="impl">implement · continually</div>
+          </div>
+        </div>
+
+        <div class="closing ani ani-d6">
+          The goal isn&rsquo;t a universal truth engine. The goal is to make your product <b>harder to trick, easier to audit, and safer to operate.</b>
+        </div>
+      </div>
+
+      <div class="footbar">
+        <div>13&middot;13</div>
+        <div class="sources">Thank you · questions welcome &middot; deck + sources internal</div>
+      </div>
+    </div>
+  </section>
+
+</deck-stage>
+
+<script src="deck-stage.js"></script>
+
+</body>
+</html>

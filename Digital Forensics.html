@@ -9,19 +9,19 @@
 <script src="image-slot.js"></script>
 <script type="application/json" id="speaker-notes">
 [
-  "For most of the last decade, we treated uploads as content to store, moderate, or parse. Now we have to treat them as claims about reality. A selfie video claims a person is present. A signed PDF claims a document is complete and unmodified. A photo claims an event happened the way it appears. The core problem in digital forensics is no longer academic · it is whether our products can decide what deserves trust, what deserves friction, and what deserves escalation. Over the next thirty minutes I want to give you a model for thinking about that, and a default stack you can take back to your team on Monday.",
-  "The practical question is not 'Can I detect deepfakes in the abstract?' It is 'Where in my product can a forged file create risk?' If you accept user photos or videos, this is a moderation and abuse problem. If you do remote onboarding, it becomes an injection-attack and presentation-attack problem. If customers send invoices, receipts, or claim images, it becomes a fraud problem. If you move signed PDFs through a workflow, it becomes a signature validation and chain-of-custody problem. The same uploaded file can be all four of those things depending on the product surface it lands on.",
-  "This distinction matters because detection methods change by category. Copy-move and splicing are classic image-tampering problems. Voice cloning and face swaps are synthetic-media problems. A digitally signed PDF can be solved by cryptographic validation. A photographed contract or scanned invoice is a visual-forensics problem. A selfie video for onboarding is a biometric capture problem. If we collapse all of these into the word 'deepfake,' our engineering design gets worse. The discipline you reach for depends on whether the asset was captured, generated, or signed.",
-  "This is the central slide of the talk. If you remember one thing, remember this stack. Provenance and signatures answer: who or what claims authorship, and can we validate that claim? Metadata and structure answer: what do the file container and history say? Passive clues answer: what traces did editing or generation leave in the pixels, frames, or waveform? Model detectors answer: how does a trained system score this asset? Context answers: where else has this content appeared, and does the surrounding story hold together? Strong systems do not pick one layer. They combine them, and they trust positive evidence more than negative evidence. A valid signature is stronger than a detector saying 'probably real.'",
-  "The biggest mindset shift I want this audience to make is from pure detection to provenance. C2PA gives you a standard way to attach signed provenance to media · a manifest containing assertions, a claim, and a cryptographic signature, with hard bindings like file hashes and soft bindings like fingerprints or invisible watermarks. The CAI even recommends progressive disclosure · a simple check at level one, full forensic trust signals at level four. In parallel, proactive watermarking systems like Google's SynthID embed signals into AI-generated content that survive cropping, filtering, and lossy compression. The crucial caveat · missing credentials do not prove a file is fake. Adoption is incomplete, and metadata can be stripped in distribution.",
-  "For images and PDFs your quick-triage order should be boring and fast. ExifTool reads metadata across hundreds of file formats · camera, timestamps, edit history, GPS, writing software, embedded provenance. For media, ffprobe and MediaInfo expose container, codec, writing application, bit rate, color space. For PDFs, qpdf checks structure and PDFiD scans for suspicious keywords like slash-JS, slash-OpenAction, slash-Launch, slash-XFA. None of this is detection. It is triage. It tells you what the file claims about itself before any model gets involved, and it costs almost nothing per upload.",
-  "Classic image forensics still matters. JPEG quantization tables can sometimes confirm or deny an image's source, and double JPEG compression reveals that an image was loaded and re-saved · though that alone is not proof of malicious tampering. Geometric and physical cues · shadows, reflections, vanishing points, environmental lighting · remain useful, especially when multiple objects in a supposedly authentic scene should obey the same physics. For documents, the field is moving toward multi-type tamper localization rather than binary classification. These are the clues a human forensic analyst would look at, and they remain a useful escalation layer above metadata.",
-  "This slide is where you earn trust with the audience. Say it clearly · absence of evidence is not evidence of authenticity. Detectors are not solved. Deepfake-Eval-2024 reports that open-source state-of-the-art detector AUC drops sharply on recent in-the-wild content. Berkeley's 2025 work found no fine-tuning method achieved meaningful zero-shot generalization to unseen generators. Even commercial models do not yet match human forensic analysts. The honest engineering posture is not 'deploy a classifier and be done.' It is 'deploy layered signals, benchmark on recent data, and keep human escalation paths.'",
-  "Context is often the fastest human-in-the-loop layer. Reverse image search via Google Lens or Bing finds prior appearances, alternative crops, earlier contexts of suspicious imagery. The InVID Verification Plugin combines keyframe extraction, reverse search, magnification, forensic filters, and metadata reading in a single browser workflow · it's the closest thing the analyst community has to a Swiss army knife. For high-stakes media, corroboration is what turns a probabilistic score into a defensible decision. Your product can give analysts a console that does this; it doesn't have to remain a manual workflow forever.",
-  "This is where many teams make expensive mistakes. If a document is natively digitally signed, start with the signature, the certificate chain, the timestamp, and the validation status. Adobe and Docusign both describe tamper-evident seals, hash-based signing, audit trails, and invalidation if bytes change after signing. That is the cleanest positive-evidence path you'll find anywhere in this talk. But if the file is just a photo or scan or a flattened PDF, that protection does not exist. Then you treat it as a forensic image problem · structural PDF checks, suspicious-object triage, visual tamper detection, OCR cross-checks, and human review.",
-  "This is the architecture I would recommend for production systems. Never analyze a transformed derivative first. Store the original bytes in a quarantine bucket. Run generic secure-upload controls, then extract metadata and provenance before any transcoding or resizing. Pass only necessary derived features to your detectors. Save the outputs as structured evidence, not just a single score. Then let a policy engine decide · auto-allow, add friction, request resubmission, or escalate to a human reviewer. For high-stakes flows, archive the original, the hash, the analysis logs, and the decision record together as one evidence object.",
-  "Most failures in this space are product failures, not model failures. If your UI shows a single red 'fake' badge, users will over-trust it and analysts will under-learn from it. A better pattern is evidence cards · signature status, provenance status, metadata anomalies, detector outputs, and context findings shown side by side, each explainable on its own. Users should see what can be explained. Analysts should see the original, the derived media, and the machine findings together. For low-risk products, you may only log these signals. For high-risk products, you can turn them into friction · resubmission, a liveness step-up, or a manual check.",
-  "If I were turning this talk into engineering work on Monday, I would do three things. First, preserve originals and hashes in the upload path · this is the cheapest, highest-leverage change you can make this quarter. Second, add first-pass provenance and signature checks wherever the modality allows it · that is where positive evidence lives. Third, benchmark one detection flow on recent, in-the-wild examples before any policy depends on it. The goal is not to build a universal truth engine. The goal is to make your product harder to trick, easier to audit, and safer to operate. Thank you · I'd love questions."
+  "Meet Bob Lyra — a fictional Australian fraudster who submitted three files to a property platform in under four minutes this morning. A selfie video for onboarding. A signed lease PDF. A photo of property damage for an insurance claim. All three look plausible. All three are fake. Bob is our running example for the next thirty minutes, because he is more instructive than an abstract threat model. Every technique he uses, and every forensic layer that catches him, is real. Bob is fictional. The problem is not.",
+  "Bob does not attack one surface. He attacks four simultaneously, because each surface has different trust assumptions and different engineering teams watching it. On UGC, he drops a fake five-star review with a stolen profile photo — a moderation problem. On KYC, he submits a doctored NSW driver's licence — an injection-attack problem. On claims, he uploads a property damage photo where the damaged bathroom was copy-pasted from another listing — a document and image-fraud problem. On contracts, he e-signs a lease using a certificate that chains to a self-signed root — a signature chain-of-custody problem. Same Bob. Four different engineering responses required.",
+  "This is why collapsing everything into the word 'deepfake' makes your engineering worse. Bob uses three distinct techniques and each demands a different detection discipline. The copy-pasted bathroom in his damage claim is a classical image-tampering problem — copy-move detection, ELA, JPEG quantization analysis. The synthetic testimonial face he generated is a synthetic-media problem — GAN-artifact detection, temporal analysis, FaceForensics-style models. The altered bank statement he submitted is a document-fraud problem — structural PDF checks, OCR cross-validation, font-consistency analysis. One fraudster, three labs.",
+  "This is the central slide. Run Bob through all five layers. Layer one: does his lease PDF carry a valid cryptographic signature from a trusted root? No — it's self-signed. Layer two: does his damage photo's EXIF metadata say what camera, when, where? It says GPS Sydney, but the writing application metadata says it was last saved in Photoshop. Layer three: does ELA reveal copy-paste artifacts in the property photo? Yes — the bathroom region lights up at 240-plus brightness versus the 30-60 range of authentic regions. Layer four: does a deepfake detector flag his testimonial video? Maybe — but Bob used a current model and scores are borderline. Layer five: does reverse image search find his 'satisfied tenant' profile photo on Getty Images from 2021? Yes. That's the layer that seals it. Strong systems combine all five. They trust positive evidence — a valid cert, a confirmed image origin — more than probabilistic scores.",
+  "The mindset shift is from detection to provenance. Bob's deepfake testimonial got a borderline score from our detector. But if the platform had required C2PA-signed content at the upload step, it would have failed immediately — not because a model said 'probably fake,' but because no signed credential existed. C2PA wraps an asset with a manifest: assertions about the content, a cryptographic claim, a hard binding via file hash, and soft bindings like SynthID watermarks that survive recompression. The critical caveat: missing credentials do not prove a file is fake. Bob's authentic-looking selfie also lacks C2PA credentials — most consumer phones don't emit them yet. Missing provenance should raise friction, not trigger automatic rejection.",
+  "This is the terminal session from Bob's case. Run exiftool on his property damage photo: GPS shows Sydney, CreateDate shows a Tuesday morning — so far plausible. But the writing application field says 'Adobe Photoshop 26.4.' A camera-captured JPEG does not pass through Photoshop unless someone opened and re-exported it. That's not proof, but it's the single most important flag you get before running a single model. Next, ffprobe on his testimonial video shows writing application 'Kdenlive 23.08' — a Linux video editor, not a phone camera. And pdfid on his lease PDF shows a self-signed certificate with no trusted root. Five command-line tools. Sub-second runtime. Bob's case is already amber before any classifier fires.",
+  "This is what Error Level Analysis looks like on Bob's damage claim photo. ELA re-saves the image at a known JPEG quality and computes the per-pixel difference between the original and the re-save. Authentic regions that have not been edited show low error — dark in the ELA heatmap. The bathroom Bob copy-pasted from another listing shows high error — it lights up bright white, because it was saved at a different quality level and compression history than the surrounding image. Scene physics also fail: the window shadow in the authentic living-room portion falls left, but the copy-pasted bathroom's shadow falls right. Both clues together form a defensible finding.",
+  "Now for the honest slide. Bob's testimonial deepfake scored 0.71 on our ensemble detector. That is above threshold — it flagged. But a newer model, tested on Bob's generation method, scores 0.54 — borderline. The AUC gap between held-out benchmark and in-the-wild content is real and widening. Deepfake-Eval-2024 shows SOTA open-source detectors dropping from 0.94 AUC on benchmark to 0.65 on in-the-wild video. The honest posture: detectors are a signal, not an answer. They catch the careless Bobs. The careful Bobs get through unless you layer.",
+  "Bob's 'satisfied tenant' profile photo is how the case closed. A reverse image search in Google Lens surfaced the same face on Getty Images — first indexed in 2021, four years before Bob's tenancy supposedly began. That single corroboration signal is more legally defensible than any detector score. The InVID plugin ran the keyframe search in under 30 seconds. Context is often the fastest analyst tool, and it produces positive evidence — not a probabilistic score, but an indexed appearance on a stock photography site with a timestamp that pre-dates the claimed event.",
+  "Bob submitted his lease as a signed PDF. It has a signature field. It has a blue ribbon in Acrobat. But the certificate chain traces to a self-signed root CA that Bob created himself in OpenSSL in about four minutes. The chain-of-custody protection only exists if the signing root is trusted. A real DocuSign or AdobeSign document traces to a publicly audited CA on the Adobe Approved Trust List. Bob's does not. Lane A — validate the chain before trusting anything the PDF claims. Lane B — his 'bank statement' is a photo of a document, no crypto protections exist, and it goes straight to visual forensics.",
+  "Bob's case is a clean illustration of why the architecture matters. His original damage photo, his testimonial video, his lease, his bank statement — all four need to be hashed and stored before any processing touches them, because a court may later need to prove the file you analyzed is the file that was submitted. The pipeline runs L1 through L5 in parallel, saves structured evidence objects, and routes to a policy engine. Bob's case got: self-signed cert flagged, Photoshop writing-app flagged, ELA high-confidence match, detector borderline, reverse-search confirmed stock photo. Policy verdict: reject and flag for fraud review.",
+  "The analyst console in the demo is built around Bob Lyra's case file. Each evidence card maps to a forensic layer — you see the signature status, the metadata anomaly, the passive-forensics finding, the detector score, and the reverse-search result as independent cards, not a single badge. The verdict card recommends escalation, not auto-reject, because the bank statement still needs human review. This is the product design principle: evidence cards that analysts can interrogate, not a single red badge that ends conversation.",
+  "Bob Lyra is caught by three things done right. First, original bytes were hashed on arrival — the chain of evidence is intact. Second, L1 provenance and L2 metadata were run before any model fired — that is where the self-signed cert and Photoshop writing-app flags came from. Third, the context layer ran a reverse image search — that is what turned a borderline detector score into a confirmed fraud referral. Bob is fictional. The platform changes are not. Thank you."
 ]
 </script>
 
@@ -1345,8 +1345,8 @@
             <div class="head"><span>EVIDENCE&nbsp;A</span><span>VIDEO/MP4</span></div>
             <div class="thumb-art video"></div>
             <div>
-              <div class="label">Onboarding selfie</div>
-              <div class="filename">liveness_3120.mp4</div>
+              <div class="label">KYC selfie video</div>
+              <div class="filename">bob_lyra_selfie.mp4</div>
             </div>
             <div class="stamp">UNVERIFIED</div>
           </div>
@@ -1354,17 +1354,17 @@
             <div class="head"><span>EVIDENCE&nbsp;B</span><span>DOC/PDF</span></div>
             <div class="thumb-art pdf"></div>
             <div>
-              <div class="label">Signed contract</div>
-              <div class="filename">msa_acme_v4.pdf</div>
+              <div class="label">Signed lease</div>
+              <div class="filename">lease_b_lyra_signed.pdf</div>
             </div>
-            <div class="stamp">SIGNED</div>
+            <div class="stamp">SELF-SIGNED</div>
           </div>
           <div class="upload ani ani-d6">
             <div class="head"><span>EVIDENCE&nbsp;C</span><span>IMG/JPEG</span></div>
             <div class="thumb-art photo"></div>
             <div>
-              <div class="label">Viral news photo</div>
-              <div class="filename">IMG_8842.jpg</div>
+              <div class="label">Damage claim photo</div>
+              <div class="filename">property_damage_bob.jpg</div>
             </div>
             <div class="stamp">CONTESTED</div>
           </div>
@@ -1390,43 +1390,43 @@
       </div>
 
       <div class="ani ani-d1" style="display: flex; align-items: baseline; gap: 32px;">
-        <div class="eyebrow">For engineers, not investigators</div>
+        <div class="eyebrow">Meet Bob Lyra · four surfaces, four attacks</div>
       </div>
 
       <h1 class="title ani ani-d2" style="margin-top: 14px; max-width: 1500px; font-size: 76px;">
-        Same forged file. <em>Different problem</em> on every surface.
+        Same fraudster. <em>Different problem</em> on every surface.
       </h1>
 
       <div class="s2-grid">
         <div class="surface ani ani-d3">
           <div class="num">A&middot;01</div>
-          <h3>User-generated content</h3>
-          <image-slot id="s2-ugc" placeholder="Social feed / community post"></image-slot>
+          <h3>Bob&rsquo;s fake review</h3>
+          <image-slot id="s2-ugc" placeholder="Bob's 5-star review with stolen profile photo"></image-slot>
           <div class="threat"><b>moderation &amp; abuse</b></div>
         </div>
         <div class="surface ani ani-d4">
           <div class="num">A&middot;02</div>
-          <h3>Onboarding &amp; KYC</h3>
-          <image-slot id="s2-kyc" placeholder="ID upload &middot; selfie UI"></image-slot>
+          <h3>Bob&rsquo;s myID</h3>
+          <image-slot id="s2-kyc" placeholder="Doctored NSW driver's licence · myID submission"></image-slot>
           <div class="threat"><b>presentation &amp; injection</b></div>
         </div>
         <div class="surface ani ani-d5">
           <div class="num">A&middot;03</div>
-          <h3>Claims &amp; support</h3>
-          <image-slot id="s2-claims" placeholder="Invoice / receipt / damage photo"></image-slot>
-          <div class="threat"><b>document &amp; expense fraud</b></div>
+          <h3>Bob&rsquo;s damage claim</h3>
+          <image-slot id="s2-claims" placeholder="Property photo with copy-pasted damage area"></image-slot>
+          <div class="threat"><b>document &amp; image fraud</b></div>
         </div>
         <div class="surface ani ani-d6">
           <div class="num">A&middot;04</div>
-          <h3>Contracts &amp; legal</h3>
-          <image-slot id="s2-contracts" placeholder="Signed PDF / Docusign UI"></image-slot>
+          <h3>Bob&rsquo;s lease</h3>
+          <image-slot id="s2-contracts" placeholder="Lease PDF with self-signed certificate"></image-slot>
           <div class="threat"><b>signature &amp; chain-of-custody</b></div>
         </div>
       </div>
 
       <div class="footbar">
         <div>02&middot;13</div>
-        <div class="sources">NIST SP 800-63-4 · Adobe / Docusign signature guidance</div>
+        <div class="sources">FICTIONAL · for educational use only · Bob Lyra is a synthetic case study · NIST SP 800-63-4 · Adobe / DocuSign signature guidance</div>
       </div>
     </div>
   </section>
@@ -1443,36 +1443,36 @@
       </div>
 
       <h1 class="title ani ani-d1" style="max-width: 1500px;">
-        Don&rsquo;t collapse this into <em>&ldquo;deepfakes.&rdquo;</em>
+        Bob uses three techniques. <em>Three different detectives</em> required.
       </h1>
-      <p class="lede ani ani-d2" style="margin-top: 24px; max-width: 1200px;">If you do, your engineering design gets worse. Each category demands a different detection discipline.</p>
+      <p class="lede ani ani-d2" style="margin-top: 24px; max-width: 1200px;">Collapse them into &ldquo;deepfakes&rdquo; and your engineering response gets worse. Each requires a different forensic discipline.</p>
 
       <div class="s3-cols">
         <div class="s3-col ani ani-d3">
           <div class="num">01</div>
           <div class="kicker">Image forensics</div>
-          <h3>Tampering</h3>
-          <image-slot id="s3-tamper" placeholder="Splice / copy-move / erase-fill example"></image-slot>
+          <h3>Copy-move tampering</h3>
+          <image-slot id="s3-tamper" placeholder="Bob's damage photo · copy-move regions highlighted"></image-slot>
         </div>
 
         <div class="s3-col ani ani-d4">
           <div class="num">02</div>
           <div class="kicker">Synthetic media</div>
-          <h3>Deepfakes</h3>
-          <image-slot id="s3-deep" placeholder="Real / fake face pair"></image-slot>
+          <h3>Synthetic face</h3>
+          <image-slot id="s3-deep" placeholder="Bob's fake testimonial · real vs GAN-generated frame"></image-slot>
         </div>
 
         <div class="s3-col ani ani-d5">
           <div class="num">03</div>
-          <div class="kicker">Mixed lanes</div>
-          <h3>Document fraud</h3>
-          <image-slot id="s3-doc" placeholder="Forged ID / altered contract"></image-slot>
+          <div class="kicker">Document forensics</div>
+          <h3>Altered bank statement</h3>
+          <image-slot id="s3-doc" placeholder="Bob's bank statement · spliced income figures highlighted"></image-slot>
         </div>
       </div>
 
       <div class="footbar">
         <div>03&middot;13</div>
-        <div class="sources">FaceForensics++ · DFDC · NIST 800-63-4 · image-tampering survey literature</div>
+        <div class="sources">FICTIONAL · Bob Lyra case study · FaceForensics++ · DFDC · NIST 800-63-4 · image-tampering survey literature</div>
       </div>
     </div>
   </section>
@@ -1628,22 +1628,22 @@
           <div class="term">
             <div class="chrome">
               <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              <span class="path">~ /forensics/case-3120 &nbsp;·&nbsp; zsh</span>
+              <span class="path">~ /forensics/BOB-LYRA-2026 &nbsp;·&nbsp; zsh</span>
             </div>
             <div class="body">
-              <span class="line l1"><span class="prompt">$</span> <span class="cmd">sha256sum suspicious.mp4</span></span>
-              <span class="line l2"><span class="out">9c4f1…ae71  suspicious.mp4</span></span>
-              <span class="line l3"><span class="prompt">$</span> <span class="cmd">exiftool -j -G1 suspicious.jpg</span></span>
-              <span class="line l4"><span class="out">[ExifIFD] CreateDate    : 2026:04:12 18:02:04</span></span>
-              <span class="line l5"><span class="out">[Composite] GPSPosition  : <span class="warn">missing</span></span></span>
-              <span class="line l6"><span class="out">[XMP-c2pa] Manifest      : <span class="ok">present · valid</span></span></span>
-              <span class="line l7"><span class="prompt">$</span> <span class="cmd">ffprobe -v quiet -show_streams clip.mp4</span></span>
-              <span class="line l8"><span class="out">writing_app : <span class="warn">"HitFilm Express 17"</span></span></span>
-              <span class="line l9"><span class="out">codec       : h264 · yuv420p · 30/1 fps</span></span>
-              <span class="line l10"><span class="prompt">$</span> <span class="cmd">c2patool clip.mp4</span></span>
-              <span class="line l11"><span class="out">manifest    : <span class="ok">verified · signer = acme-cam/2.3</span></span></span>
-              <span class="line l12"><span class="prompt">$</span> <span class="cmd">pdfid.py contract.pdf</span></span>
-              <span class="line l13"><span class="out">/JavaScript : <span class="err">2</span>  &middot;  /OpenAction : <span class="err">1</span>  &middot;  /XFA : 0</span></span>
+              <span class="line l1"><span class="prompt">$</span> <span class="cmd">exiftool -j -G1 property_damage_bob.jpg</span></span>
+              <span class="line l2"><span class="out">[ExifIFD] CreateDate    : 2026:03:15 09:44:22</span></span>
+              <span class="line l3"><span class="out">[Composite] GPSPosition  : -33.8688, 151.2093  <span class="ok">(Sydney)</span></span></span>
+              <span class="line l4"><span class="out">[IFD0]     Software      : <span class="warn">Adobe Photoshop 26.4</span></span></span>
+              <span class="line l5"><span class="out">[XMP-c2pa] Manifest      : <span class="warn">missing</span></span></span>
+              <span class="line l6"><span class="prompt">$</span> <span class="cmd">ffprobe -v quiet -show_streams bob_lyra_selfie.mp4</span></span>
+              <span class="line l7"><span class="out">writing_app : <span class="warn">"Kdenlive 23.08"</span>  &larr; video editor, not camera</span></span>
+              <span class="line l8"><span class="out">codec       : h264 · yuv420p · 30/1 fps</span></span>
+              <span class="line l9"><span class="prompt">$</span> <span class="cmd">pdfid.py lease_b_lyra_signed.pdf</span></span>
+              <span class="line l10"><span class="out">/JavaScript : 0  &middot;  /OpenAction : 0  &middot;  /XFA : 0</span></span>
+              <span class="line l11"><span class="out">sig_count   : <span class="ok">1</span>  &middot;  trust_chain : <span class="err">self-signed root</span></span></span>
+              <span class="line l12"><span class="prompt">$</span> <span class="cmd">sha256sum property_damage_bob.jpg</span></span>
+              <span class="line l13"><span class="out">a7c3d…f882  property_damage_bob.jpg  &rarr; <span class="ok">original preserved</span></span></span>
               <span class="line l14"><span class="prompt">$</span> <span class="caret"></span></span>
             </div>
           </div>
@@ -1670,7 +1670,7 @@
 
       <div class="s7">
         <div>
-          <div class="eyebrow ani ani-d1">Probabilistic · pixel-level</div>
+          <div class="eyebrow ani ani-d1">Bob&rsquo;s damage photo · pixel-level analysis</div>
           <h1 class="title ani ani-d2">
             What did the editor<br/><em>leave behind?</em>
           </h1>
@@ -1680,29 +1680,29 @@
               <div class="id">C&middot;01</div>
               <div>
                 <h3>JPEG history</h3>
-                <p>Quantization signatures &amp; double-compression. A re-saved file isn&rsquo;t proof of tampering, but it has a history.</p>
+                <p>The copy-pasted bathroom was saved at a different JPEG quality than the surrounding room. Double-compression lights it up in ELA.</p>
               </div>
             </div>
             <div class="clue ani ani-d4">
               <div class="id">C&middot;02</div>
               <div>
                 <h3>Scene physics</h3>
-                <p>Shadows, reflections, vanishing points, lighting. Hard to fake completely.</p>
+                <p>Window shadow in the living room falls left. Copy-pasted bathroom shadow falls right. Same sun, different physics.</p>
               </div>
             </div>
             <div class="clue ani ani-d5">
               <div class="id">C&middot;03</div>
               <div>
                 <h3>Localization</h3>
-                <p>Which region was tampered. Not a single yes/no label.</p>
+                <p>ELA pins the tampered region to the bathroom corner. Not &ldquo;this photo is fake&rdquo; — <em>this tile is fake.</em></p>
               </div>
             </div>
           </div>
         </div>
 
         <div class="ani ani-d6">
-          <image-slot id="s7-scene" placeholder="Shadow / lighting forensic example, or JPEG ELA visualization" style="aspect-ratio: 4/3; width: 100%;"></image-slot>
-          <div class="slot-note"><span class="tag">FIG 07-A</span>Find a scene with shadow / reflection inconsistencies, or an Error-Level-Analysis (ELA) visualization showing a spliced region lighting up.</div>
+          <image-slot id="s7-scene" placeholder="ELA heatmap of Bob's property photo · copy-pasted bathroom lights up bright white" style="aspect-ratio: 4/3; width: 100%;"></image-slot>
+          <div class="slot-note"><span class="tag">FIG 07-A</span>ELA visualization of Bob&rsquo;s damage claim photo. The copy-pasted bathroom region shows 240+ brightness vs. 30–60 in authentic areas. Classic double-compression artifact.</div>
         </div>
       </div>
 
@@ -1809,11 +1809,11 @@
 
       <div class="s9">
         <div>
-          <div class="eyebrow ani ani-d1">Where else has this been?</div>
+          <div class="eyebrow ani ani-d1">Bob&rsquo;s &ldquo;satisfied tenant&rdquo; photo has been around.</div>
           <h1 class="title ani ani-d2">
             One image,<br/><em>many witnesses.</em>
           </h1>
-          <p class="lede ani ani-d3" style="margin-top: 24px;">Corroboration turns a probabilistic score into a defensible decision.</p>
+          <p class="lede ani ani-d3" style="margin-top: 24px;">Corroboration turns a borderline detector score into a confirmed fraud referral.</p>
 
           <div class="tools-grid ani ani-d5">
             <div class="toolcard">
@@ -1840,8 +1840,8 @@
         </div>
 
         <div class="ani ani-d4">
-          <image-slot id="s9-reverse" placeholder="Reverse image search results &middot; Google Lens / Bing / InVID" style="aspect-ratio: 4/3; width: 100%;"></image-slot>
-          <div class="slot-note"><span class="tag">FIG 09-A</span>Screenshot of Google Lens or Bing visual results showing the same image surfacing across multiple sites &amp; dates, or InVID&rsquo;s reverse-search panel with thumbnail matches.</div>
+          <image-slot id="s9-reverse" placeholder="Google Lens results for Bob's 'satisfied tenant' profile photo → stock photo sites" style="aspect-ratio: 4/3; width: 100%;"></image-slot>
+          <div class="slot-note"><span class="tag">FIG 09-A</span>Reverse image search of the profile photo Bob used for his &ldquo;satisfied tenant&rdquo; testimonial. First indexed on Getty Images, 2021 — four years before Bob&rsquo;s supposed tenancy began.</div>
         </div>
       </div>
 
@@ -1864,32 +1864,32 @@
       </div>
 
       <h1 class="title ani ani-d1" style="max-width: 1500px;">
-        Signed PDF vs. photo of a contract: <em>not the same problem.</em>
+        Bob&rsquo;s lease vs. a real signed PDF: <em>not the same problem.</em>
       </h1>
 
       <div class="s10">
         <div class="lane signed ani ani-d3">
           <div class="topband"><span class="dotpos" style="margin-right: 12px;"></span>LANE A &nbsp; · &nbsp; CRYPTOGRAPHIC</div>
-          <h3>Native signed PDF</h3>
-          <image-slot id="s10-signed" placeholder="Acrobat / Docusign signature-validation panel"></image-slot>
+          <h3>Legitimate signed PDF</h3>
+          <image-slot id="s10-signed" placeholder="Acrobat signature panel · trusted root CA · green checkmark"></image-slot>
           <div class="steps">
-            <div class="step"><div>Verify signer cert &amp; trust chain</div><div class="stat">verify</div></div>
-            <div class="step"><div>Validate hash over byte ranges</div><div class="stat">verify</div></div>
-            <div class="step"><div>Check timestamp &amp; revocation</div><div class="stat">verify</div></div>
+            <div class="step"><div>Cert chain traces to trusted CA root</div><div class="stat">verified</div></div>
+            <div class="step"><div>Hash covers all byte ranges</div><div class="stat">verified</div></div>
+            <div class="step"><div>Timestamp &amp; revocation valid</div><div class="stat">verified</div></div>
           </div>
-          <div class="takeaway">Any byte change invalidates the seal.</div>
+          <div class="takeaway">Any byte change invalidates the seal. Bob&rsquo;s doesn&rsquo;t have this.</div>
         </div>
 
         <div class="lane scanned ani ani-d4">
           <div class="topband"><span class="dotcau" style="margin-right: 12px;"></span>LANE B &nbsp; · &nbsp; VISUAL FORENSIC</div>
-          <h3>Photo / scan / flattened PDF</h3>
-          <image-slot id="s10-scanned" placeholder="Photo of paper contract or flattened-PDF page"></image-slot>
+          <h3>Bob&rsquo;s &ldquo;bank statement&rdquo;</h3>
+          <image-slot id="s10-scanned" placeholder="Bob's faked bank statement · scanned look but digital artifacts"></image-slot>
           <div class="steps">
             <div class="step"><div><tt>qpdf</tt> &amp; <tt>pdfid.py</tt> triage</div><div class="stat">triage</div></div>
-            <div class="step"><div>Visual tamper-localization</div><div class="stat">probabilistic</div></div>
-            <div class="step"><div>OCR cross-check &amp; analyst</div><div class="stat">analyst</div></div>
+            <div class="step"><div>ELA &amp; font-consistency check</div><div class="stat">anomaly</div></div>
+            <div class="step"><div>OCR cross-check &amp; analyst review</div><div class="stat">escalate</div></div>
           </div>
-          <div class="takeaway">An image case dressed up as a document.</div>
+          <div class="takeaway">Looks scanned. Created digitally 90 seconds before submission.</div>
         </div>
       </div>
 
@@ -2008,55 +2008,55 @@
         <div class="ani ani-d3">
           <div class="console">
             <div class="topbar2">
-              <div><b>case</b> · 3120-A &nbsp;·&nbsp; <span class="id">flagged</span> &nbsp;·&nbsp; uploaded 18:02:04Z</div>
-              <div>analyst · m.tanaka</div>
+              <div><b>case</b> · BOB-LYRA-2026 &nbsp;·&nbsp; <span class="id">all layers flagged</span> &nbsp;·&nbsp; submitted 09:44:22 AEST</div>
+              <div>analyst · s.chen</div>
             </div>
             <div class="grid">
               <div class="preview">
                 <div class="img"></div>
                 <div class="meta">
-                  <b>liveness_3120.mp4</b><br/>
-                  20.4MB · h264 · 30fps<br/>
-                  sha256 9c4f1…ae71<br/>
-                  uploader · acct-44213<br/>
-                  ip · geo-mismatch
+                  <b>property_damage_bob.jpg</b><br/>
+                  3.2MB · JPEG · 4032×3024<br/>
+                  sha256 a7c3d…f882<br/>
+                  uploader · b.lyra@quickprops.com.au<br/>
+                  gps · Sydney CBD · confirmed
                 </div>
               </div>
               <div class="cards">
-                <div class="ecard e1 cau">
-                  <div class="ehead"><span>L·01 · Provenance</span><span class="stat">PARTIAL</span></div>
-                  <h5>C2PA manifest missing</h5>
-                  <p>not signed · platform doesn't embed</p>
+                <div class="ecard e1 neg">
+                  <div class="ehead"><span>L·01 · Provenance</span><span class="stat">FAIL</span></div>
+                  <h5>Lease cert · self-signed root</h5>
+                  <p>not on Adobe Approved Trust List · Bob generated CA in OpenSSL</p>
                 </div>
-                <div class="ecard e2 cau">
+                <div class="ecard e2 neg">
                   <div class="ehead"><span>L·02 · Metadata</span><span class="stat">ANOMALY</span></div>
-                  <h5>Writing-app = HitFilm 17</h5>
-                  <p>expected: device-captured · re-rendered timeline</p>
+                  <h5>Software = Photoshop 26.4</h5>
+                  <p>camera-captured JPEG shouldn't re-export through Photoshop</p>
                 </div>
                 <div class="ecard e3 neg">
                   <div class="ehead"><span>L·03 · Passive</span><span class="stat">HIGH</span></div>
-                  <h5>Lip-sync drift 86ms</h5>
-                  <p>frames 1240–1310 · audio leads video</p>
+                  <h5>ELA · bathroom region 240+ px</h5>
+                  <p>authentic area baseline 30–60 · copy-move confirmed</p>
                 </div>
                 <div class="ecard e4 cau">
                   <div class="ehead"><span>L·04 · Detector</span><span class="stat">0.71</span></div>
-                  <h5>Synthetic face · likely</h5>
-                  <p>ensemble · 3 of 4 detectors agree</p>
+                  <h5>Testimonial · synthetic face likely</h5>
+                  <p>ensemble · 3 of 4 agree · borderline on newest model</p>
                 </div>
-                <div class="ecard e5 neu">
-                  <div class="ehead"><span>L·05 · Context</span><span class="stat">2 MATCHES</span></div>
-                  <h5>Reverse search · prior appearances</h5>
-                  <p>identical thumbnail seen on stock-image agency catalog · 2024-08 &middot; 2025-02</p>
+                <div class="ecard e5 neg">
+                  <div class="ehead"><span>L·05 · Context</span><span class="stat">CONFIRMED</span></div>
+                  <h5>Profile photo → Getty Images 2021</h5>
+                  <p>tenancy claimed 2025 · stock photo predates claim by 4 years</p>
                 </div>
                 <div class="verdict">
                   <div>
                     <div class="label">Policy verdict</div>
-                    <div class="val">Escalate · request liveness step-up</div>
+                    <div class="val">Reject &amp; refer · fraud operations · all four surfaces</div>
                   </div>
                   <div class="actions">
                     <button class="btn">Allow</button>
-                    <button class="btn primary">Step-up</button>
-                    <button class="btn">Reject</button>
+                    <button class="btn">Step-up</button>
+                    <button class="btn primary">Refer fraud</button>
                   </div>
                 </div>
               </div>
@@ -2084,7 +2084,7 @@
       </div>
 
       <div class="s13">
-        <div class="kicker ani ani-d1">If you remember three verbs:</div>
+        <div class="kicker ani ani-d1">How Bob Lyra gets caught · three engineering changes:</div>
 
         <div class="threeverbs">
           <div class="verb ani ani-d2">
@@ -2108,13 +2108,13 @@
         </div>
 
         <div class="closing ani ani-d6">
-          The goal isn&rsquo;t a universal truth engine. The goal is to make your product <b>harder to trick, easier to audit, and safer to operate.</b>
+          Bob Lyra is fictional. The platform changes are not. Make your product <b>harder to trick, easier to audit, and safer to operate.</b>
         </div>
       </div>
 
       <div class="footbar">
         <div>13&middot;13</div>
-        <div class="sources">Thank you · questions welcome &middot; deck + sources internal</div>
+        <div class="sources">FICTIONAL CASE STUDY · Bob Lyra is a synthetic educational character · not based on any real person · for instructional use only · Thank you · questions welcome</div>
       </div>
     </div>
   </section>

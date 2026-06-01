@@ -1,0 +1,310 @@
+/* ============================================================
+   Trust by Design — CORE styling (tokens, stage, chrome,
+   HUD, verdict card, shared scene primitives)
+   Editorial-lab palette: warm paper, ink black, alert-red signal.
+   ============================================================ */
+
+:root {
+  /* surfaces */
+  --paper: #f1ece1;
+  --paper-2: #e7e0d1;
+  --paper-3: #ddd4c2;
+  --ink: #1c1a16;
+  --ink-2: #6a6359;
+  --ink-3: #98917f;
+  --line: rgba(28, 26, 22, 0.14);
+  --line-2: rgba(28, 26, 22, 0.28);
+  --surround: #14120f;
+
+  /* signal (tweakable) — soft/line derive from --signal */
+  --signal: #e5484d;
+  --signal-soft: color-mix(in srgb, var(--signal) 14%, transparent);
+  --signal-line: color-mix(in srgb, var(--signal) 45%, transparent);
+
+  /* verdict states */
+  --v-verified: #1f8a5b;
+  --v-suspicious: #c97a12;
+  --v-unknown: #8a857c;
+  --v-review: #3d6fe0;
+
+  /* type */
+  --display: "Bricolage Grotesque", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --pad: 110px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--surround);
+  overflow: hidden;
+  font-family: var(--display);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#stagewrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: center center;
+  background: var(--paper);
+  overflow: hidden;
+  /* warm paper grain via layered gradients */
+  background-image:
+    radial-gradient(120% 90% at 100% 0%, rgba(255,255,255,0.5), transparent 55%),
+    radial-gradient(120% 120% at 0% 100%, rgba(0,0,0,0.04), transparent 55%);
+}
+
+#scene-root { position: absolute; inset: 0; }
+
+.scene {
+  position: absolute;
+  inset: 0;
+  padding: var(--pad);
+}
+
+/* ---------- shared scene primitives ---------- */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 22px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.eyebrow::before {
+  content: "";
+  width: 34px; height: 2px;
+  background: var(--signal);
+  display: inline-block;
+}
+
+.scene-line {
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.mono { font-family: var(--mono); }
+
+/* ============================================================
+   Chrome (controls live OUTSIDE the scaled stage)
+   ============================================================ */
+#chrome {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  display: none;            /* hidden for full-screen presentation; keyboard controls (← → space R) still work. Change to "flex" to show the control bar. */
+  align-items: center;
+  gap: 22px;
+  padding: 16px 26px;
+  color: #d9d2c4;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
+  pointer-events: none;
+}
+#chrome > * { pointer-events: auto; }
+
+.cbtn {
+  appearance: none;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #efe9dc;
+  width: 38px; height: 38px;
+  border-radius: 9px;
+  cursor: pointer;
+  display: grid; place-items: center;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.cbtn:hover { background: rgba(255,255,255,0.16); }
+.cbtn svg { width: 16px; height: 16px; fill: currentColor; }
+#c-play .pause { display: none; }
+#c-play[data-playing="true"] .pause { display: block; }
+#c-play[data-playing="true"] .play { display: none; }
+
+#c-meta { display: flex; flex-direction: column; gap: 3px; min-width: 280px; }
+#c-name { color: #f3ede0; font-size: 14px; letter-spacing: 0.02em; }
+#c-num { color: #9a9384; font-size: 12px; }
+
+#c-bar {
+  flex: 1;
+  height: 3px;
+  background: rgba(255,255,255,0.14);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#c-barfill {
+  height: 100%;
+  background: var(--signal);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+#c-dots { display: flex; gap: 7px; }
+.dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+  border: none; padding: 0; cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.dot:hover { background: rgba(255,255,255,0.45); }
+.dot.on { background: var(--signal); transform: scale(1.25); }
+
+/* ============================================================
+   Trust-Pipeline HUD (persistent thin 7-stage rail)
+   ============================================================ */
+#hud {
+  position: absolute;
+  left: var(--pad); right: var(--pad);
+  bottom: 78px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  z-index: 20;
+}
+#hud.show { opacity: 1; }
+
+.hud-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: 26px;
+  white-space: nowrap;
+}
+
+.hud-rail { display: flex; align-items: center; flex: 1; }
+.hud-stage {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  position: relative;
+}
+.hud-node {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--line-2);
+  background: var(--paper);
+  flex: none;
+  position: relative;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+.hud-node .flare {
+  position: absolute; inset: -7px;
+  border-radius: 50%;
+  background: var(--signal);
+  opacity: 0;
+  transform: scale(0.4);
+}
+.hud-label {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.hud-link {
+  flex: 1;
+  height: 2px;
+  background: var(--line);
+  margin: 0 12px;
+  position: relative;
+  overflow: hidden;
+  min-width: 18px;
+}
+.hud-link::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: var(--signal-line);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+/* lit (history) */
+.hud-stage.lit .hud-node { border-color: var(--signal-line); background: var(--signal-soft); }
+.hud-stage.lit .hud-label { color: var(--ink-2); }
+/* active (caught this scene) */
+.hud-stage.active .hud-node { border-color: var(--signal); }
+.hud-stage.active .hud-label { color: var(--signal); font-weight: 600; }
+
+/* ============================================================
+   Verdict card (reusable component)
+   ============================================================ */
+.verdict {
+  width: 460px;
+  background: var(--paper);
+  border: 1.5px solid var(--line-2);
+  border-radius: 16px;
+  padding: 28px 30px 26px;
+  box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35);
+}
+.verdict-head {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 18px;
+}
+.verdict-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 19px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  opacity: 0;
+}
+.verdict-row .vk { color: var(--ink-2); white-space: nowrap; }
+.verdict-row .vv { color: var(--ink); font-weight: 500; }
+.verdict-stamp {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.01em;
+  opacity: 0;
+}
+.verdict-stamp .chip {
+  width: 16px; height: 16px; border-radius: 50%;
+}
+.v-state-Verified { color: var(--v-verified); }
+.v-state-Verified .chip { background: var(--v-verified); }
+.v-state-Suspicious { color: var(--v-suspicious); }
+.v-state-Suspicious .chip { background: var(--v-suspicious); }
+.v-state-Unknown { color: var(--v-unknown); }
+.v-state-Unknown .chip { background: var(--v-unknown); }
+.v-state-Needs.review, .v-state-Needs-review { color: var(--v-review); }
+.v-state-Needs-review .chip { background: var(--v-review); }
+
+/* ---------- generic count-up number ---------- */
+.countup { font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.tampered { color: var(--signal); }

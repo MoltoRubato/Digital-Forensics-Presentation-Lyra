@@ -91,10 +91,8 @@
     if (Deck.playing) {
       Deck.elapsed += dt * Deck.pace;
       const total = totalDur();
-      if (Deck.elapsed >= total) {
-        if (Deck.i < TBD.scenes.length - 1) { Deck.i++; buildScene(); }
-        else { Deck.elapsed = total; } // hold on last scene
-      }
+      // No auto-advance: hold on the final frame. Move on only via manual input (left-click / arrow keys).
+      if (Deck.elapsed >= total) { Deck.elapsed = total; }
     }
     const p = TBD.clamp(Deck.elapsed / dur, 0, 1);
     if (s.update) s.update(p);
@@ -162,6 +160,12 @@
       else if (e.key === "ArrowLeft") { e.preventDefault(); TBD.prev(); }
       else if (e.key === " ") { e.preventDefault(); TBD.togglePlay(); }
       else if (e.key === "r" || e.key === "R") { TBD.restart(); }
+    });
+
+    // left-click anywhere advances to the next slide (ignore clicks on the Tweaks panel)
+    window.addEventListener("click", (e) => {
+      if (e.target.closest && e.target.closest("#tweaks-root")) return;
+      TBD.next();
     });
 
     window.addEventListener("resize", fit);

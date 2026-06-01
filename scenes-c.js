@@ -1,5 +1,5 @@
 /* ============================================================
-   Trust by Design — scenes 11–14  (11 = hero)
+   Trust by Design — scenes 10–13  (v2 · 10 = hero)
    ============================================================ */
 (function () {
   const TBD = window.TBD;
@@ -7,62 +7,69 @@
   const reg = TBD.register;
 
   /* ============================================================
-     SCENE 11 — HERO: production architecture (7-box pipeline)
+     SCENE 10 — HERO: production architecture (7-box pipeline)
+     The cheap-inspection stage (Metadata / OCR) forks by media
+     type — image path vs document path — before any model runs.
      ============================================================ */
   reg({
-    id: "s11", name: "Architecture", title: "The architecture I\u2019d ship", dur: 19,
+    id: "s10", name: "Architecture", title: "The architecture I’d ship", dur: 19,
     build(el, c) {
-      el.classList.add("s11");
-      const head = h("div", "s11-head");
+      el.classList.add("s10");
+      const head = h("div", "s10-head");
       head.appendChild(h("div", "eyebrow", c.eyebrow));
-      head.appendChild(h("div", "scene-line s11-line", c.line));
+      head.appendChild(h("div", "scene-line s10-line", c.line));
       el.appendChild(head);
 
-      const stage = h("div", "s11-stage");
-      const rail = h("div", "s11-rail");
+      const stage = h("div", "s10-stage");
+      const rail = h("div", "s10-rail");
       const boxes = [];
       c.stages.forEach((st, i) => {
         if (i > 0) {
           const con = h("div", "arch-con");
           rail.appendChild(con);
         }
-        const box = h("div", "arch-box" + (i === 4 ? " expensive" : "") + (i === 5 ? " policy" : ""));
+        const box = h("div", "arch-box" + (i === 4 ? " expensive" : "") + (i === 5 ? " policy" : "") + (i === 3 ? " fork" : ""));
         box.appendChild(h("span", "arch-idx mono", String(i + 1).padStart(2, "0")));
         box.appendChild(h("span", "arch-k", st.k));
         box.appendChild(h("span", "arch-s mono", st.s));
+        // media-type fork tags on the cheap-inspection stage (idx 3)
+        if (i === 3) {
+          const fork = h("div", "arch-fork mono");
+          fork.appendChild(h("span", "fork-img", "image"));
+          fork.appendChild(h("span", "fork-doc", "document"));
+          box.appendChild(fork);
+          box._fork = fork;
+        }
         // small dropped artifact for some stages
         const drop = h("div", "arch-drop mono");
-        const dropText = { 1: "sha-256", 3: "exif", 4: "0.81" }[i];
+        const dropText = { 1: "sha-256", 4: "0.81" }[i];
         if (dropText) { drop.textContent = dropText; box.appendChild(drop); box._drop = drop; }
         rail.appendChild(box);
         boxes.push(box);
       });
-      const token = h("div", "s11-token mono");
+      const token = h("div", "s10-token mono");
       token.appendChild(h("span", null, c.token));
       rail.appendChild(token);
       stage.appendChild(rail);
 
-      // compact verdict at the end
       const v = TBD.makeVerdict({
         head: "Reviewer verdict",
         fields: [
           { k: "provenance", v: "none" },
-          { k: "metadata", v: "2 flags" },
+          { k: "structure", v: "2 flags" },
           { k: "model score", v: "0.81" },
         ],
         verdict: c.verdict,
       });
-      v.el.classList.add("s11-verdict");
+      v.el.classList.add("s10-verdict");
       stage.appendChild(v.el);
       el.appendChild(stage);
 
-      // measure box centers (layout coords, unaffected by stage scale)
       const cons = [...rail.querySelectorAll(".arch-con")];
       this._r = { boxes, cons, token, v, centers: null };
     },
     _measure() {
       const { boxes, token } = this._r;
-      const railRect = token.parentElement;
       this._r.centers = boxes.map((b) => b.offsetLeft + b.offsetWidth / 2);
       this._r.tokenW = token.offsetWidth;
     },
@@ -104,6 +111,12 @@
           box._drop.style.opacity = dt.toFixed(3);
           box._drop.style.transform = `translateY(${lerp(-6, 0, dt)}px)`;
         }
+        // the media-type fork reveals as the token reaches the cheap-inspection stage
+        if (box._fork) {
+          const ft = clamp((fi - (i - 0.6)) * 1.3, 0, 1);
+          box._fork.style.opacity = ft.toFixed(3);
+          box._fork.style.setProperty("--fork", ft.toFixed(3));
+        }
       });
       // policy engine (idx 5) heartbeat at decision point
       const polBox = boxes[5];
@@ -120,17 +133,17 @@
   });
 
   /* ============================================================
-     SCENE 12 — Toolbox matrix (3D card flips)
+     SCENE 11 — Toolbox matrix (3D card flips · 4×3)
      ============================================================ */
   reg({
-    id: "s12", name: "Toolbox", title: "Current toolbox", dur: 12,
+    id: "s11", name: "Toolbox", title: "Current toolbox", dur: 12,
     build(el, c) {
-      el.classList.add("s12");
-      const head = h("div", "s12-head");
+      el.classList.add("s11");
+      const head = h("div", "s11-head");
       head.appendChild(h("div", "eyebrow", c.eyebrow));
-      head.appendChild(h("div", "scene-line s12-line", c.line));
+      head.appendChild(h("div", "scene-line s11-line", c.line));
       el.appendChild(head);
-      const grid = h("div", "s12-grid");
+      const grid = h("div", "s11-grid");
       const cells = c.cells.map((cell) => {
         const cl = h("div", "tool-cell");
         const inner = h("div", "tool-inner");
@@ -139,16 +152,17 @@
         inner.appendChild(h("div", "tool-t mono", cell.t));
         cl.appendChild(inner);
         grid.appendChild(cl);
-        return { cl, inner, row: 0 };
+        return { cl, inner };
       });
       el.appendChild(grid);
       this._r = { cells };
     },
     update(p) {
       const { cells } = this._r;
+      const COLS = 4;
       cells.forEach((cell, i) => {
-        const rowcol = Math.floor(i / 3) + (i % 3);
-        const a = 0.04 + rowcol * 0.08;
+        const rowcol = Math.floor(i / COLS) + (i % COLS);
+        const a = 0.04 + rowcol * 0.07;
         const t = seg(p, a, a + 0.3, ease.outCubic);
         const rot = lerp(82, 0, t);
         cell.inner.style.transform = `perspective(900px) rotateY(${rot}deg)`;
@@ -158,14 +172,14 @@
   });
 
   /* ============================================================
-     SCENE 13 — Six rules (kinetic typography)
+     SCENE 12 — Six rules (kinetic typography)
      ============================================================ */
   reg({
-    id: "s13", name: "Six rules", title: "Six rules to remember", dur: 16,
+    id: "s12", name: "Six rules", title: "Six rules to remember", dur: 16,
     build(el, c) {
-      el.classList.add("s13");
-      el.appendChild(h("div", "eyebrow s13-eyebrow", c.eyebrow));
-      const stage = h("div", "s13-stage");
+      el.classList.add("s12");
+      el.appendChild(h("div", "eyebrow s12-eyebrow", c.eyebrow));
+      const stage = h("div", "s12-stage");
       const rules = c.rules.map((t, i) => {
         const r = h("div", "rule");
         r.appendChild(h("span", "rule-idx mono", String(i + 1).padStart(2, "0")));
@@ -196,25 +210,24 @@
         r.classList.toggle("parked", park > 0.5);
         r.style.zIndex = isSpot ? 10 : 1;
       });
-      // final glow together
       const glow = seg(p, 0.88, 1, ease.outCubic);
       this._r.rules.forEach((r) => r.style.setProperty("--glow", glow.toFixed(3)));
     },
   });
 
   /* ============================================================
-     SCENE 14 — Mini-workshop & close
+     SCENE 13 — Mini-workshop & close
      ============================================================ */
   reg({
-    id: "s14", name: "Close", title: "Workshop & close", dur: 13,
+    id: "s13", name: "Close", title: "Workshop & close", dur: 13,
     build(el, c) {
-      el.classList.add("s14");
+      el.classList.add("s13");
       el.appendChild(h("div", "eyebrow", c.eyebrow));
-      const q = h("div", "scene-line s14-q", c.line);
+      const q = h("div", "scene-line s13-q", c.line);
       el.appendChild(q);
-      const chips = h("div", "s14-chips");
+      const chips = h("div", "s13-chips");
       const chipEls = c.chips.map((t) => {
-        const ch = h("div", "s14-chip");
+        const ch = h("div", "s13-chip");
         ch.appendChild(h("span", "chip-num mono", ""));
         ch.appendChild(h("span", null, t));
         chips.appendChild(ch);
@@ -222,7 +235,7 @@
       });
       chipEls.forEach((ch, i) => (ch.querySelector(".chip-num").textContent = "0" + (i + 1)));
       el.appendChild(chips);
-      const close = h("div", "s14-close", c.close);
+      const close = h("div", "s13-close", c.close);
       el.appendChild(close);
       this._r = { q, chipEls, close };
     },

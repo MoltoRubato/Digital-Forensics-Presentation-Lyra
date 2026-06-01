@@ -21,11 +21,17 @@
      ============================================================ */
   const STAGES = ["Ingest", "Store", "Provenance", "Metadata", "Model", "Policy", "Review"];
   // active stages per scene index (0-based). Catches build cumulatively.
+  // v2 indices: 2 attack1 · 3 fix1 · 4 attack2 · 5 fix2 · 6 vendors · 7 document · 8 preserve
   const ACTIVE = {
-    2: [3], 3: [0], 4: [2, 4], 5: [2, 3, 4, 5],
-    6: [4], 7: [0, 5], 8: [1, 3], 9: [1, 6],
+    2: [0],          // edited screenshot caught at ingest/metadata
+    3: [2, 4],       // verify sources -> provenance + model
+    4: [2, 3, 4, 5], // AI image scan lights the cheap+provenance+policy path
+    5: [4],          // evidence stack -> model scoring
+    6: [2, 4],       // vendor signals feed provenance + model
+    7: [3, 6],       // document structure -> metadata + review
+    8: [1, 6],       // preserve -> immutable store + review
   };
-  const VISIBLE = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
+  const VISIBLE = new Set([2, 3, 4, 5, 6, 7, 8]);
 
   const HUD = (TBD.HUD = {
     el: null, nodes: [], links: [], labels: [], stagesEl: [],

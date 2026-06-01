@@ -27,16 +27,10 @@
       el.appendChild(head);
 
       const stageEl = h("div", "s01-stage");
-      const glyphs = ["screenshot", "selfie", "voice", "pdf"];
+      const glyphs = ["screenshot", "selfie", "pdf"];
       const chips = c.artifacts.map((label, i) => {
         const chip = h("div", "artifact a-" + glyphs[i]);
         chip.appendChild(h("div", "art-glyph g-" + glyphs[i]));
-        if (glyphs[i] === "voice") {
-          const w = h("div", "art-glyph g-voice");
-          chip.querySelector(".art-glyph").remove();
-          for (let k = 0; k < 5; k++) w.appendChild(h("span"));
-          chip.appendChild(w);
-        }
         chip.appendChild(h("div", "art-label mono", label));
         stageEl.appendChild(chip);
         return chip;
@@ -49,10 +43,10 @@
     },
     update(p) {
       const { chips, submit, hl } = this._r;
-      // grid slot offsets (relative to center of stage area)
-      const slots = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
-      const startPos = [[-520, -360], [560, -340], [-560, 360], [540, 380]];
-      const SX = 215, SY = 150;
+      // three artifact chips converge into one Submit (relative to stage centre)
+      const slots = [[-1.5, 0], [0, 0], [1.5, 0]];
+      const startPos = [[-560, -340], [0, -440], [560, 360]];
+      const SX = 250, SY = 150;
       chips.forEach((chip, i) => {
         const inT = seg(p, 0.05 + i * 0.07, 0.42 + i * 0.07, ease.outBackSoft);
         const gx = slots[i][0] * SX, gy = slots[i][1] * SY;
@@ -240,48 +234,72 @@
       el.appendChild(head);
 
       const stage = h("div", "s04-stage");
+
+      // LEFT — the uploaded screenshot, which de-emphasises to a low-trust fallback
       const shot = h("div", "s04-shot");
       shot.appendChild(h("div", "shot-label mono", "uploaded screenshot"));
       const noise = h("div", "shot-noise");
       for (let i = 0; i < 60; i++) noise.appendChild(h("span"));
       shot.appendChild(noise);
+      shot.appendChild(h("div", "shot-lowtrust mono", "low-trust fallback"));
       stage.appendChild(shot);
 
+      // RIGHT — the app core acts as a vertical bus; each signed source taps in
       const hub = h("div", "s04-hub");
-      hub.appendChild(h("div", "hub-core mono", "app"));
-      const lines = [];
-      const sources = c.sources.map((s, i) => {
+      const core = h("div", "hub-core");
+      core.appendChild(h("span", "mono", "app"));
+      hub.appendChild(core);
+
+      const list = h("div", "src-list");
+      const branches = [];
+      const sources = c.sources.map((s) => {
+        const row = h("div", "src-row");
+        const branch = h("div", "src-branch");
         const node = h("div", "src-node");
+        node.appendChild(h("span", "src-dot"));
         node.appendChild(h("span", "mono", s));
-        hub.appendChild(node);
-        const ln = h("div", "src-line");
-        hub.appendChild(ln);
-        lines.push(ln);
+        row.appendChild(branch);
+        row.appendChild(node);
+        list.appendChild(row);
+        branches.push(branch);
         return node;
       });
+      hub.appendChild(list);
+
       const badge = h("div", "s04-badge");
       badge.appendChild(h("span", "chip-dot"));
       badge.appendChild(h("span", null, c.badge));
       hub.appendChild(badge);
+
       stage.appendChild(hub);
       el.appendChild(stage);
-      this._r = { shot, noise, sources, lines, badge };
+      this._r = { shot, core, sources, branches, badge };
     },
     update(p) {
-      const { shot, sources, lines, badge } = this._r;
+      const { shot, core, sources, branches, badge } = this._r;
+      // screenshot enters, then dims + sinks as it loses primacy
       const inS = seg(p, 0, 0.2, ease.outCubic);
-      shot.style.opacity = clamp(inS - seg(p, 0.34, 0.52), 0, 1).toFixed(3);
-      const dis = seg(p, 0.32, 0.55, ease.inCubic);
-      shot.style.setProperty("--dis", dis.toFixed(3));
-      shot.style.transform = `translateY(${lerp(0, 14, dis)}px) scale(${lerp(1, 0.94, dis)})`;
+      const fade = seg(p, 0.34, 0.52, ease.inOutCubic);
+      shot.style.opacity = clamp(inS - fade * 0.5, 0, 1).toFixed(3);
+      shot.style.setProperty("--dis", seg(p, 0.34, 0.6, ease.inCubic).toFixed(3));
+      shot.style.transform = `translateY(${lerp(0, 16, fade)}px) scale(${lerp(1, 0.94, fade)})`;
+      shot.classList.toggle("dimmed", fade > 0.5);
+
+      // app bus rises in
+      const co = seg(p, 0.42, 0.58, ease.outBackSoft);
+      core.style.opacity = clamp(co * 1.3, 0, 1).toFixed(3);
+      core.style.transform = `scaleY(${lerp(0.86, 1, co)})`;
+
+      // each source taps the bus: connector draws, card slides in
       sources.forEach((node, i) => {
-        const a = 0.5 + i * 0.1;
+        const a = 0.6 + i * 0.11;
         const t = seg(p, a, a + 0.2, ease.outBackSoft);
         node.style.opacity = clamp(t * 1.2, 0, 1).toFixed(3);
-        node.style.transform = `translateX(${lerp(40, 0, t)}px)`;
-        lines[i].style.setProperty("--draw", seg(p, a - 0.06, a + 0.14, ease.outCubic).toFixed(3));
+        node.style.transform = `translateX(${lerp(28, 0, t)}px)`;
+        branches[i].style.setProperty("--draw", seg(p, a - 0.08, a + 0.12, ease.outCubic).toFixed(3));
       });
-      const b = seg(p, 0.82, 0.97, ease.outBackSoft);
+
+      const b = seg(p, 0.88, 0.99, ease.outBackSoft);
       badge.style.opacity = clamp(b * 1.3, 0, 1).toFixed(3);
       badge.style.transform = `scale(${lerp(0.7, 1, b)})`;
     },

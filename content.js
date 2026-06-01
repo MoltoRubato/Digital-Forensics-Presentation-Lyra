@@ -36,6 +36,21 @@ window.CONTENT = {
     ],
     flag: "still looks legit",
   },
+  s03b: {
+    eyebrow: "Attempt 1 · forensic read",
+    line: "Five places a faked screenshot leaks.",
+    real: "assets/card-real.png",
+    fake: "assets/card-fake.png",
+    realLabel: "Genuine record",
+    fakeLabel: "Tampered upload",
+    points: [
+      { k: "Container & encoding", d: "header tells before any decode · Sharp" },
+      { k: "Metadata + hash", d: "editor stamps the software field · ExifTool" },
+      { k: "Recompression", d: "edited glyphs don’t match neighbours · ELA" },
+      { k: "OCR cross-field logic", d: "the numbers contradict each other" },
+      { k: "Template match", d: "layout against the known card" },
+    ],
+  },
   s04: {
     eyebrow: "What actually catches screenshot fraud",
     line: "Don’t verify screenshots. Verify sources.",
@@ -50,6 +65,18 @@ window.CONTENT = {
     scanLabel: "Provenance scan",
     result: "No Content Credentials found",
     fallback: "no credential is not proof of real · fall back to other checks",
+  },
+  s05b: {
+    eyebrow: "Attempt 2 · forensic read",
+    line: "When the manifest is missing, keep reading.",
+    img: "assets/selfie.jpg",
+    imgLabel: "generated · no capture",
+    points: [
+      { k: "Content Credentials", d: "signed origin, tool, edits, AI flag · C2PA" },
+      { k: "Mostly default in 2026", d: "ChatGPT · Gemini · Firefly" },
+      { k: "No credential is not real", d: "stripped on re-encode · CDNs, Slack" },
+      { k: "Read & validate", d: "c2pa-node · c2pa-python · c2patool" },
+    ],
   },
   s06: {
     eyebrow: "How the app should handle AI-generated images",
@@ -89,6 +116,18 @@ window.CONTENT = {
     ],
     outputs: ["intact", "modified", "cannot verify"],
     verdict: "modified",
+  },
+  s08b: {
+    eyebrow: "Attempt 3 · forensic read",
+    line: "A structured file carries its own edit log.",
+    stamp: "OFFICIAL",
+    points: [
+      { k: "Append-only revisions", d: "PDFs append, never overwrite" },
+      { k: "Structure triage", d: "pdfid · pdf-parser · qpdf · pikepdf" },
+      { k: "Rasterized PDF?", d: "flatten loses structure + text layer" },
+      { k: "OCR vs embedded text", d: "the mismatch is the tell" },
+      { k: "Three-state output", d: "intact / modified / cannot verify" },
+    ],
   },
   s09: {
     eyebrow: "Handling documents & higher-stakes evidence",

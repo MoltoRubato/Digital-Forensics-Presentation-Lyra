@@ -211,6 +211,44 @@
   });
 
   /* ============================================================
+     SCENE 8b — Attempt 3 forensic read (document left, points right)
+     ============================================================ */
+  reg({
+    id: "s08b", name: "Attempt 3 · read", title: "Attempt 3 · forensic read", dur: 14,
+    build(el, c) {
+      el.classList.add("fread", "s08b");
+      const head = h("div", "fread-head");
+      head.appendChild(h("div", "eyebrow", c.eyebrow));
+      head.appendChild(h("div", "scene-line fread-line", c.line));
+      el.appendChild(head);
+
+      const stage = h("div", "fread-stage");
+      const ev = h("div", "fread-evidence");
+      // same stamped document mockup, held in place from the attack slide
+      const doc = h("div", "fread-doc");
+      const sheet = h("div", "doc-sheet");
+      for (let i = 0; i < 5; i++) sheet.appendChild(h("div", "doc-line" + (i === 0 ? " head" : "")));
+      const stamp = h("div", "doc-stamp", c.stamp);
+      doc.appendChild(sheet);
+      doc.appendChild(stamp);
+      ev.appendChild(doc);
+      stage.appendChild(ev);
+
+      const pts = TBD.makePoints(c);
+      stage.appendChild(pts.el);
+      el.appendChild(stage);
+      this._r = { doc, pts };
+    },
+    update(p) {
+      const { doc, pts } = this._r;
+      const inD = seg(p, 0, 0.2, ease.outCubic);
+      doc.style.opacity = clamp(inD * 1.2, 0, 1).toFixed(3);
+      doc.style.transform = `translateY(${lerp(22, 0, inD)}px)`;
+      TBD.drivePoints(pts, p, { start: 0.24, stagger: 0.11 });
+    },
+  });
+
+  /* ============================================================
      SCENE 9 — Preserve bytes, structure, uncertainty (chain assembles)
      ============================================================ */
   reg({

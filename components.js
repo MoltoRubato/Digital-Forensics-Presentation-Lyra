@@ -21,17 +21,21 @@
      ============================================================ */
   const STAGES = ["Ingest", "Store", "Provenance", "Metadata", "Model", "Policy", "Review"];
   // active stages per scene index (0-based). Catches build cumulatively.
-  // v2 indices: 2 attack1 · 3 fix1 · 4 attack2 · 5 fix2 · 6 vendors · 7 document · 8 preserve
+  // v2 indices: 2 attack1 · 3 attack1-read · 4 fix1 · 5 attack2 · 6 attack2-read ·
+  //             7 fix2 · 8 vendors · 9 document · 10 document-read · 11 preserve
   const ACTIVE = {
     2: [0],          // edited screenshot caught at ingest/metadata
-    3: [2, 4],       // verify sources -> provenance + model
-    4: [2, 3, 4, 5], // AI image scan lights the cheap+provenance+policy path
-    5: [4],          // evidence stack -> model scoring
-    6: [2, 4],       // vendor signals feed provenance + model
-    7: [3, 6],       // document structure -> metadata + review
-    8: [1, 6],       // preserve -> immutable store + review
+    3: [3],          // attack1 forensic read -> metadata signals
+    4: [2, 4],       // verify sources -> provenance + model
+    5: [2, 3, 4, 5], // AI image scan lights the cheap+provenance+policy path
+    6: [2],          // attack2 forensic read -> provenance
+    7: [4],          // evidence stack -> model scoring
+    8: [2, 4],       // vendor signals feed provenance + model
+    9: [3, 6],       // document structure -> metadata + review
+    10: [3],         // document forensic read -> structure / metadata
+    11: [1, 6],      // preserve -> immutable store + review
   };
-  const VISIBLE = new Set([2, 3, 4, 5, 6, 7, 8]);
+  const VISIBLE = new Set([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
   const HUD = (TBD.HUD = {
     el: null, nodes: [], links: [], labels: [], stagesEl: [],
@@ -121,6 +125,45 @@
     const st = seg(p, stampAt, stampAt + 0.18, ease.outBackSoft);
     refs.stamp.style.opacity = clamp(st * 1.4, 0, 1).toFixed(3);
     refs.stamp.style.transform = "scale(" + lerp(0.82, 1, st).toFixed(3) + ")";
+  };
+
+  /* ============================================================
+     forensic-read points list — reusable evidence dot points
+     Builds a titled list of {k,d} rows; drivePoints staggers them.
+     ============================================================ */
+  TBD.makePoints = function (content) {
+    const el = h("div", "fr-points");
+    // optional sub-head (omit when the scene already shows the line as its headline)
+    if (content.pointsHead) el.appendChild(h("div", "fr-head", content.pointsHead));
+    const rows = (content.points || []).map((pt) => {
+      const r = h("div", "fr-row");
+      r.appendChild(h("span", "fr-mark"));
+      const body = h("div", "fr-body");
+      body.appendChild(h("div", "fr-k", pt.k));
+      body.appendChild(h("div", "fr-d mono", pt.d));
+      r.appendChild(body);
+      el.appendChild(r);
+      return r;
+    });
+    return { el, rows, head: el.querySelector(".fr-head") };
+  };
+
+  TBD.drivePoints = function (refs, p, opts) {
+    opts = opts || {};
+    const start = opts.start != null ? opts.start : 0.18;
+    const stagger = opts.stagger != null ? opts.stagger : 0.11;
+    if (refs.head) {
+      const t = seg(p, start - 0.12, start, ease.outCubic);
+      refs.head.style.opacity = t.toFixed(3);
+      refs.head.style.transform = "translateY(" + lerp(16, 0, t).toFixed(2) + "px)";
+    }
+    refs.rows.forEach((r, i) => {
+      const a = start + i * stagger;
+      const t = seg(p, a, a + 0.2, ease.outCubic);
+      r.style.opacity = t.toFixed(3);
+      r.style.transform = "translateX(" + lerp(22, 0, t).toFixed(2) + "px)";
+      r.classList.toggle("on", t > 0.85);
+    });
   };
 
   /* ============================================================

@@ -222,6 +222,51 @@
   });
 
   /* ============================================================
+     SCENE 3b — Attack 1 forensic read (evidence left, points right)
+     ============================================================ */
+  reg({
+    id: "s03b", name: "Attempt 1 · read", title: "Attempt 1 · forensic read", dur: 13,
+    build(el, c) {
+      el.classList.add("fread", "s03b");
+      const head = h("div", "fread-head");
+      head.appendChild(h("div", "eyebrow", c.eyebrow));
+      head.appendChild(h("div", "scene-line fread-line", c.line));
+      el.appendChild(head);
+
+      const stage = h("div", "fread-stage");
+      // LEFT — same two phones, held in place from the attack slide
+      const phones = h("div", "fread-evidence twin");
+      const mk = (src, label, cls) => {
+        const ph = h("div", "phone " + cls);
+        const im = document.createElement("img");
+        im.src = src; im.alt = label;
+        ph.appendChild(im);
+        ph.appendChild(h("div", "phone-tag mono", label));
+        phones.appendChild(ph);
+        return ph;
+      };
+      const real = mk(c.real, c.realLabel, "real");
+      const fake = mk(c.fake, c.fakeLabel, "fake");
+      stage.appendChild(phones);
+
+      const pts = TBD.makePoints(c);
+      stage.appendChild(pts.el);
+      el.appendChild(stage);
+      this._r = { real, fake, pts };
+    },
+    update(p) {
+      const { real, fake, pts } = this._r;
+      const inA = seg(p, 0, 0.18, ease.outCubic);
+      [real, fake].forEach((ph, i) => {
+        const t = seg(p, i * 0.06, 0.18 + i * 0.06, ease.outCubic);
+        ph.style.opacity = t.toFixed(3);
+        ph.style.transform = `translateY(${lerp(24, 0, t)}px)`;
+      });
+      TBD.drivePoints(pts, p, { start: 0.24, stagger: 0.12 });
+    },
+  });
+
+  /* ============================================================
      SCENE 4 — Verify sources, not screenshots
      ============================================================ */
   reg({
@@ -364,6 +409,42 @@
       const rt = seg(p, 0.72, 0.9, ease.outBackSoft);
       result.style.opacity = clamp(rt * 1.3, 0, 1).toFixed(3);
       result.style.transform = `translateY(${lerp(16, 0, rt)}px)`;
+    },
+  });
+
+  /* ============================================================
+     SCENE 5b — Attack 2 forensic read (selfie left, points right)
+     ============================================================ */
+  reg({
+    id: "s05b", name: "Attempt 2 · read", title: "Attempt 2 · forensic read", dur: 13,
+    build(el, c) {
+      el.classList.add("fread", "s05b");
+      const head = h("div", "fread-head");
+      head.appendChild(h("div", "eyebrow", c.eyebrow));
+      head.appendChild(h("div", "scene-line fread-line", c.line));
+      el.appendChild(head);
+
+      const stage = h("div", "fread-stage");
+      const ev = h("div", "fread-evidence");
+      const frame = h("div", "fread-frame");
+      const im = document.createElement("img");
+      im.src = c.img; im.alt = "AI selfie";
+      frame.appendChild(im);
+      frame.appendChild(h("div", "fread-imglabel mono", c.imgLabel));
+      ev.appendChild(frame);
+      stage.appendChild(ev);
+
+      const pts = TBD.makePoints(c);
+      stage.appendChild(pts.el);
+      el.appendChild(stage);
+      this._r = { frame, pts };
+    },
+    update(p) {
+      const { frame, pts } = this._r;
+      const inF = seg(p, 0, 0.2, ease.outCubic);
+      frame.style.opacity = inF.toFixed(3);
+      frame.style.transform = `scale(${lerp(0.96, 1, inF)})`;
+      TBD.drivePoints(pts, p, { start: 0.24, stagger: 0.12 });
     },
   });
 })();
